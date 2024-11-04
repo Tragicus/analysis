@@ -1001,14 +1001,18 @@ by rewrite ltrBlDr=> afg; rewrite (lt_le_trans afg)// addrC lerD2r ltW.
 Qed.
 
 Lemma measurable_funB D f g : measurable_fun D f ->
-  measurable_fun D g -> measurable_fun D (f \- g).
-Proof. by move=> ? ?; apply: measurable_funD =>//; exact: measurableT_comp. Qed.
+  measurable_fun D g -> measurable_fun D (f - g).
+Proof.
+move=> ? ?; apply: measurable_funD =>//.
+exact: (measurableT_comp (f:=@GRing.opp R)).
+Qed.
 
 Lemma measurable_funM D f g :
-  measurable_fun D f -> measurable_fun D g -> measurable_fun D (f \* g).
+  measurable_fun D f -> measurable_fun D g -> measurable_fun D (f * g).
 Proof.
-move=> mf mg; rewrite (_ : (_ \* _) = (fun x => 2%:R^-1 * (f x + g x) ^+ 2)
-  \- (fun x => 2%:R^-1 * (f x ^+ 2)) \- (fun x => 2%:R^-1 * (g x ^+ 2))).
+move=> mf mg.
+rewrite (_ : (_ * _) = (fun x => 2%:R^-1 * (f x + g x) ^+ 2)
+  - (fun x => 2%:R^-1 * (f x ^+ 2)) - (fun x => 2%:R^-1 * (g x ^+ 2))).
   apply: measurable_funB; first apply: measurable_funB.
   - apply: measurableT_comp => //.
     by apply: measurableT_comp (exprn_measurable _) _; exact: measurable_funD.
@@ -1016,7 +1020,8 @@ move=> mf mg; rewrite (_ : (_ \* _) = (fun x => 2%:R^-1 * (f x + g x) ^+ 2)
     exact: measurableT_comp (exprn_measurable _) _.
   - apply: measurableT_comp => //.
     exact: measurableT_comp (exprn_measurable _) _.
-rewrite funeqE => x /=; rewrite -2!mulrBr sqrrD (addrC (f x ^+ 2)) -addrA.
+rewrite funeqE => x /=.
+rewrite !GRing.sub_funE -2!mulrBr sqrrD (addrC (f x ^+ 2)) -addrA.
 rewrite -(addrA (f x * g x *+ 2)) -opprB opprK (addrC (g x ^+ 2)) addrK.
 by rewrite -(mulr_natr (f x * g x)) -(mulrC 2) mulrA mulVr ?mul1r// unitfE.
 Qed.

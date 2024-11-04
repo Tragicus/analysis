@@ -196,7 +196,7 @@ Lemma expectation_sum (X : seq {RV P >-> R}) :
     (forall Xi, Xi \in X -> P.-integrable [set: T] (EFin \o Xi)) ->
   'E_P[\sum_(Xi <- X) Xi] = \sum_(Xi <- X) 'E_P[Xi].
 Proof.
-elim: X => [|X0 X IHX] intX; first by rewrite !big_nil expectation_cst.
+elim: X => [|X0 X IHX] intX; first by rewrite !big_nil (expectation_cst 0).
 have intX0 : P.-integrable [set: T] (EFin \o X0).
   by apply: intX; rewrite in_cons eqxx.
 have {}intX Xi : Xi \in X -> P.-integrable [set: T] (EFin \o Xi).
@@ -230,7 +230,9 @@ have ? : 'E_P[X] \is a fin_num by rewrite fin_num_abs// integrable_expectation.
 have ? : 'E_P[Y] \is a fin_num by rewrite fin_num_abs// integrable_expectation.
 rewrite unlock [X in 'E_P[X]](_ : _ = (X \* Y \- fine 'E_P[X] \o* Y
     \- fine 'E_P[Y] \o* X \+ fine ('E_P[X] * 'E_P[Y]) \o* cst 1)%R); last first.
-  apply/funeqP => x /=; rewrite mulrDr !mulrDl/= mul1r fineM// mulrNN addrA.
+  apply/funeqP => x /=.
+  rewrite -[LHS]/((_ \* _)%R x)/= !GRing.sub_funE/= GRing.sub_funE.
+  rewrite mulrDr !mulrDl/= mul1r fineM// mulrNN addrA.
   by rewrite mulrN mulNr [Z in (X x * Y x - Z)%R]mulrC.
 have ? : P.-integrable [set: T] (EFin \o (X \* Y \- fine 'E_P[X] \o* Y)%R).
   by rewrite compreBr ?integrableB// compre_scale ?integrableZl.
@@ -459,7 +461,7 @@ rewrite varianceD/= ?varianceN ?covarianceNr ?muleN//.
 - by rewrite mulrN compreN ?integrableN.
 Qed.
 
-Lemma varianceD_cst_l c (X : {RV P >-> R}) :
+Lemma varianceD_cst_l (c : R) (X : {RV P >-> R}) :
     P.-integrable setT (EFin \o X) -> P.-integrable setT (EFin \o (X ^+ 2)%R) ->
   'V_P[(cst c \+ X)%R] = 'V_P[X].
 Proof.
@@ -480,7 +482,7 @@ have -> : (X \+ cst c = cst c \+ X)%R by apply/funeqP => x /=; rewrite addrC.
 exact: varianceD_cst_l.
 Qed.
 
-Lemma varianceB_cst_l c (X : {RV P >-> R}) :
+Lemma varianceB_cst_l (c : R) (X : {RV P >-> R}) :
     P.-integrable setT (EFin \o X) -> P.-integrable setT (EFin \o (X ^+ 2)%R) ->
   'V_P[(cst c \- X)%R] = 'V_P[X].
 Proof.

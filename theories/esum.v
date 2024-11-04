@@ -589,7 +589,8 @@ near=> n.
 rewrite distrC subr0.
 have -> : (C_ = A_ \- B_)%R.
   apply/funext => k.
-  rewrite /= /A_ /C_ /B_ -sumrN -big_split/= -summable_fine_sum//.
+  rewrite /= /A_ /C_ /B_ GRing.add_funE GRing.opp_funE.
+  rewrite -sumrN -big_split/= -summable_fine_sum//.
   apply eq_bigr => i Pi; rewrite -fineB//.
   - by rewrite [in LHS](funeposneg f).
   - by rewrite fin_num_abs (@summable_pinfty _ _ P) //; exact/summable_funepos.

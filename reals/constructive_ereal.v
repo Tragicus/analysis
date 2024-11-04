@@ -137,7 +137,7 @@ Definition er_map T T' (f : T -> T') (x : \bar T) : \bar T' :=
 Lemma er_map_idfun T (x : \bar T) : er_map idfun x = x.
 Proof. by case: x. Qed.
 
-Definition fine {R : zmodType} x : R := if x is EFin v then v else 0.
+Definition fine {R : zmodType} x : R := if x is EFin v then v else 0%R.
 
 Section EqEReal.
 Variable (R : eqType).

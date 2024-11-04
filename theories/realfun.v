@@ -2368,7 +2368,8 @@ have ffin: TV a x f \is a fin_num.
 have Nffin : TV a x (\- f) \is a fin_num.
   apply/bounded_variationP => //; apply/bounded_variationN.
   exact: (bounded_variationl ax xb).
-rewrite /pos_tv /neg_tv /= total_variationN -fineB -?muleBl // ?fineM //.
+rewrite /pos_tv /neg_tv /= !GRing.add_funE !GRing.opp_funE/=.
+rewrite  total_variationN -fineB -?muleBl // ?fineM //.
 - rewrite addeAC oppeD //= ?fin_num_adde_defl //.
   by rewrite addeA subee // add0e -EFinD //= opprK mulrDl -splitr.
 - by rewrite fin_numB ?fin_numD ?ffin; apply/andP; split.

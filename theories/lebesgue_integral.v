@@ -5991,7 +5991,8 @@ Qed.
 Lemma locally_integrableN D f :
   locally_integrable D f -> locally_integrable D (\- f)%R.
 Proof.
-move=> [mf oD foo]; split => //; first exact: measurableT_comp.
+move=> [mf oD foo]; split => //.
+  exact: (measurableT_comp (f:=@GRing.opp R)).
 by move=> K KD cK; under eq_integral do rewrite normrN; exact: foo.
 Qed.
 
@@ -6482,10 +6483,10 @@ Proof.
 move=> xU mU mUf cg locg; apply/eqP; rewrite eq_le; apply/andP; split.
 - rewrite [leRHS](_ : _ = f^* x + (\- g)%R^* x).
     apply: (lim_sup_davg_le xU) => //.
-    apply/(measurable_comp measurableT) => //.
+    apply/(measurable_comp (f:=@GRing.opp R) measurableT) => //.
     by case: locg => + _ _; exact: measurable_funS.
   rewrite (@continuous_lim_sup_davg (- g)%R _ _ xU mU); first by rewrite adde0.
-  - apply/(measurable_comp measurableT) => //.
+  - apply/(measurable_comp (f:=@GRing.opp R) measurableT) => //.
     by case: locg => + _ _; apply: measurable_funS.
   + by move=> y; exact/continuousN/cg.
 - rewrite [leRHS](_ : _ = ((f \- g)%R^* \+ g^*) x)//.
@@ -6870,8 +6871,9 @@ have HL_null n : mu (HLf_g_Be n) <= (3 / (e / 2))%:E * n.+1%:R^-1%:E.
   set h := (fun x => `|(f_ k \- g_ n) x|%:E) \_ (B k).
   rewrite (@eq_integral _ _ _ mu setT h)//=.
     by rewrite -integral_mkcond/=; exact: ifg_ub.
-  move=> x _; rewrite /h restrict_EFin restrict_normr/= /g_B /f_ !patchE.
-  by case: ifPn => /=; [rewrite patchE => ->|rewrite subrr].
+  move=> x _; rewrite /h restrict_EFin restrict_normr/= /g_B /f_/=.
+  rewrite GRing.sub_funE !patchE.
+  by case: ifPn => /=; [rewrite GRing.sub_funE patchE => ->|rewrite subrr].
 have fgn_null n : mu [set x | `|(f_ k \- g_B n) x|%:E >= (e / 2)%:E] <=
                      (e / 2)^-1%:E * n.+1%:R^-1%:E.
   rewrite lee_pdivlMl ?invr_gt0 ?divr_gt0// -[X in mu X]setTI.
@@ -6883,8 +6885,9 @@ have fgn_null n : mu [set x | `|(f_ k \- g_B n) x|%:E >= (e / 2)%:E] <=
   set h := (fun x => `|(f_ k \- g_ n) x|%:E) \_ (B k).
   rewrite (@eq_integral _ _ _ mu setT h)//=.
     by rewrite -integral_mkcond/=; exact: ifg_ub.
-  move=> x _; rewrite /h restrict_EFin restrict_normr/= /g_B /f_ !patchE.
-  by case: ifPn => /=; [rewrite patchE => ->|rewrite subrr].
+  move=> x _; rewrite /h restrict_EFin restrict_normr/= /g_B /f_/=.
+  rewrite GRing.sub_funE !patchE.
+  by case: ifPn => /=; [rewrite GRing.sub_funE patchE => ->|rewrite subrr].
 apply/eqP; rewrite eq_le measure_ge0 andbT.
 apply/lee_addgt0Pr => r r0; rewrite add0e.
 have incl n : Ee `<=` B k `&` (HLf_g_Be n `|` f_g_Be n) by move=> ?; apply.
