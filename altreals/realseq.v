@@ -303,7 +303,7 @@ Lemma ncvgM u v lu lv : ncvg u lu%:E -> ncvg v lv%:E ->
 Proof.
 move=> cu cv; pose a := u \- lu%:S; pose b := v \- lv%:S.
 have eq: (u \* v) =1 (lu * lv)%:S \+ ((lu%:S \* b) \+ (a \* v)).
-  move=> n; rewrite {}/a {}/b /= [u n+_]addrC [(_+_)*(v n)]mulrDl.
+  move=> n; rewrite {}/a {}/b /= [(u + _) n]addrC [(_+_)*(v n)]mulrDl.
   rewrite !addrA -[LHS]add0r; congr (_ + _); rewrite mulrDr.
   by rewrite !(mulrN, mulNr) (addrCA (lu * lv)) subrr addr0 subrr.
 apply/(ncvg_eq eq); rewrite -[X in X%:E]addr0; apply/ncvgD.

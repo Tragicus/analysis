@@ -15,6 +15,7 @@ Unset Strict Implicit.
 Unset Printing Implicit Defensive.
 Import GRing.Theory Num.Def Num.Theory.
 
+Local Open Scope ring_scope.
 Local Open Scope classical_set_scope.
 
 From mathcomp Require fintype bigop finmap.
