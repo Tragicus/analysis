@@ -224,7 +224,7 @@ Section diff_locally_converse_tentative.
 (* and thus a littleo of 1, and so is id *)
 (* This can be generalized to any dimension *)
 Lemma diff_locally_converse_part1 (f : R -> R) (a b x : R) :
-  f \o shift x = cst a + b *: idfun +o_ 0 id -> f x = a.
+  f \o shift x = cst a + b *: (@idfun R) +o_ 0 id -> f x = a.
 Proof.
 rewrite funeqE => /(_ 0) /=; rewrite add0r => ->.
 by rewrite -[LHS]/(_ 0 + _ 0 + _ 0) /cst [X in a + X]scaler0 littleo_lim0 ?addr0.
@@ -253,12 +253,12 @@ Lemma derivable_nbhs (f : V -> W) a v :
 Proof.
 move=> df; apply/eqaddoP => _/posnumP[e].
 rewrite -nbhs_nearE nbhs_simpl /= dnbhsE; split; last first.
-  rewrite /at_point opprD !GRing.add_funE !GRing.opp_funE scale0r add0r.
+  rewrite /at_point opprD !add_funE !opp_funE scale0r add0r.
   by rewrite addrA subrr add0r normrN scale0r !normr0 mulr0.
 have /eqolimP := df.
 move=> /eqaddoP /(_ e%:num) /(_ [gt0 of e%:num]).
 apply: filter_app; rewrite /= !near_simpl near_withinE; near=> h => hN0.
-rewrite /= opprD !GRing.add_funE !GRing.opp_funE.
+rewrite /= opprD !add_funE !opp_funE.
 rewrite /cst /= [`|1|]normr1 mulr1 => dfv.
 rewrite addrA -[X in X + _]scale1r -(@mulVf _ h) //.
 rewrite mulrC -scalerA -scalerBr normrZ.
@@ -276,7 +276,7 @@ move=> df; apply/cvg_ex; exists ('D_v f a).
 apply/(@eqolimP _ _ _ (dnbhs_filter_on _))/eqaddoP => _/posnumP[e].
 have /eqaddoP /(_ e%:num) /(_ [gt0 of e%:num]) := df.
 rewrite /= !(near_simpl, near_withinE); apply: filter_app; near=> h.
-rewrite /= opprD !GRing.add_funE !GRing.opp_funE.
+rewrite /= opprD !add_funE !opp_funE.
 rewrite /cst /= [`|1|]normr1 mulr1 addrA => dfv hN0.
 rewrite -[X in _ - X]scale1r -(@mulVf _ h) //.
 rewrite -scalerA -scalerBr normrZ normfV ler_pdivrMl ?normr_gt0 //.
@@ -412,7 +412,7 @@ Fact dadd (f g : V -> W) x :
 Proof.
 move=> df dg; split => [?|]; do ?exact: continuousD.
 apply/(@eqaddoE R); rewrite funeqE => y /=; rewrite -[(f + g) _]/(_ + _).
-by rewrite ![_ (_ + x)]diff_locallyx// addrACA addox addrACA.
+by rewrite add_funE ![_ (_ + x)]diff_locallyx// addrACA addox addrACA.
 Qed.
 
 Fact dopp (f : V -> W) x :
@@ -531,8 +531,7 @@ have hdf h : (f \o shift x = cst (f x) + h +o_ 0 id) ->
   by apply/eqP; rewrite eq_sym addrC addr_eq0 oppo.
 rewrite (hdf _ dxf).
 suff /diff_locally /hdf -> : differentiable f x.
-  rewrite opprD addrCA -(addrA (_ - _)) addKr GRing.add_funE GRing.opp_funE.
-  by rewrite oppox addox.
+  by rewrite opprD addrCA -(addrA (_ - _)) addKr oppox addox.
 apply/diffP => /=.
 apply: (@getPex _ (fun (df : {linear V -> W}) => continuous df /\
   forall y, f y = f (lim (nbhs x)) + df (y - lim (nbhs x))
@@ -545,7 +544,7 @@ by rewrite littleo_center0 (comp_centerK x id) -[- _ in RHS](comp_centerK x).
 Qed.
 
 Lemma diff_cst (V W : normedModType R) a x : ('d (cst a) x : V -> W) = 0.
-Proof. by apply/diff_unique; have [] := dcst a x. Qed.
+Proof. by apply/(diff_unique (df:=\0)); have [] := dcst a x. Qed.
 
 Variables (V W : normedModType R).
 
@@ -1327,7 +1326,10 @@ by rewrite [in LHS]mulr_natl exprfctE -mulrSr mulr_natl.
 Qed.
 
 Lemma derivableX f n (x v : V) : derivable f x v -> derivable (f ^+ n) x v.
-Proof. by case: n => [_|n /derivableP]; [rewrite expr0|]. Qed.
+Proof.
+case: n => [_|n /derivableP]; last by [].
+by rewrite expr0; apply/(derivable_cst (1 : R)).
+Qed.
 
 Lemma deriveX f n (x v : V) : derivable f x v ->
   'D_v (f ^+ n.+1) x = (n.+1%:R * f x ^+ n) *: 'D_v f x.
@@ -1381,7 +1383,7 @@ Proof. by rewrite derive1E derive_cst. Qed.
 Lemma exprn_derivable {R : numFieldType} n (x : R) v :
   derivable (@GRing.exp R ^~ n) x v.
 Proof.
-elim: n => [/=|n ih]; first by rewrite (_ : _ ^~ _ = 1).
+elim: n => [/=|n ih]; first by rewrite (_ : _ ^~ _ = cst 1).
 rewrite (_ : _ ^~ _ = (fun x => x * x ^+ n)); last first.
   by apply/funext => y; rewrite exprS.
 by apply: derivableM; first exact: derivable_id.
@@ -1576,7 +1578,7 @@ have gcont : {within `[a, b], continuous g}.
   move=> x; apply: continuousD _ ; first by move=>?; exact: fcont.
   by apply/continuousN/continuous_subspaceT=> ?; exact: scalel_continuous.
 have gaegb : g a = g b.
-  rewrite /g !GRing.add_funE !GRing.opp_funE.
+  rewrite /g !add_funE !opp_funE.
   apply/eqP; rewrite -subr_eq /= opprK addrAC -addrA -scalerBl.
   rewrite [_ *: _]mulrA mulrC mulrA mulVf.
     by rewrite mul1r addrCA subrr addr0.

@@ -409,13 +409,17 @@ Context (aT : pointedType) (rT : ringType).
 
 Lemma fimfun_mulr_closed : mulr_closed (@fimfun aT rT).
 Proof.
-split=> [|f g]; rewrite !inE/=; first exact: finite_image_cst.
+split=> [|f g]; rewrite !inE/=; first exact: finite_image_cst 1.
 by move=> fA gA; exact: (finite_image11 (fun x y => x * y)).
 Qed.
 
 HB.instance Definition _ :=
    @GRing.isMulClosed.Build _ (@fimfun aT rT) fimfun_mulr_closed.
-HB.instance Definition _ := [SubZmodule_isSubRing of {fimfun aT >-> rT} by <:].
+HB.howto FImFun.type subRingType.
+Set Printing All.
+Check FImFun.type _ _ : subZmodType _.
+
+Check [SubZmodule_isSubRing of {fimfun aT >-> rT} by <:].
 
 Implicit Types f g : {fimfun aT >-> rT}.
 

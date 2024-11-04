@@ -871,7 +871,7 @@ Proof. by rewrite [RHS]littleoE. Qed.
 
 Lemma scaleox (F : filter_on T) a (f : T -> V) (e : _ -> W) x :
   a *: ([o_F e of f] x) = [o_F e of a *: [o_F e of f]] x.
-Proof. by move: x; rewrite -/(_ *: _ =1 _) {1}scaleo. Qed.
+Proof. by move: x; rewrite -/(_ *: [o_F e of f] =1 _) {1}scaleo. Qed.
 
 End Domination_numFieldType.
 
