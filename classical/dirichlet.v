@@ -1,5 +1,5 @@
 From HB Require Import structures.
-From mathcomp Require Import all_ssreflect function_spaces boolp ssralg functions.
+From mathcomp Require Import all_ssreflect boolp ssralg functions.
 Import Order.OrdinalOrder Order.POrderTheory GRing.Theory.
 Local Open Scope order_scope.
 Local Open Scope nat_scope.
@@ -330,15 +330,56 @@ HB.instance Definition _ := GRing.Nmodule.on dirichlet.
 HB.instance Definition _ := GRing.Nmodule_isComNzSemiRing.Build dirichlet
   dirichlet_mulA dirichlet_mulC dirichlet_mul1f dirichlet_mulDl dirichlet_mul0f dirichlet_mul10.
 
+Lemma dirichlet_mulE_dvdn (f g : dirichlet) (n : nat) : 0 < n ->
+  (f * g) n = \sum_(1 <= d < n.+1 | d %| n) f d * g (n %/ d).
+Proof.
+move=> n0.
+rewrite [LHS]big_nat_recr//= addrC big_pred0; last first.
+  move=> d.
+  apply/eqP => /esym nd.
+  have: n.+1 %| n by apply/dvdnP; exists d; rewrite mulnC.
+  by move=> /dvdn_leq-/(_ n0); rewrite ltnn.
+rewrite add0r big_ltn// big_pred0//; last first.
+  by move=> d; rewrite mul0n eq_sym eqn0Ngt n0.
+rewrite add0r [RHS]big_mkcond [LHS]big_nat [RHS]big_nat.
+apply: eq_bigr => d /andP[] d0 dn.
+  case: ifPn => dn'; last first.
+  rewrite big_pred0// => d1.
+  apply/negP/negP; move: dn'; apply: contra => /eqP/esym dn'.
+  by apply/dvdnP; exists d1; rewrite mulnC.
+under eq_bigl do rewrite eq_sym mulnC eqn_mul// eq_sym.
+rewrite big_nat1_eq/= ltnS.
+suff ->: (n %/ d <= n.+1) by [].
+exact: (leq_trans (leq_div _ _)).
+Qed.
+
+Definition multiplicative (f : nat -> R) :=
+  forall n m, coprime n m -> f (n * m) = f n * f m.
+
+Lemma dirichlet_mul_multiplicative (f g : dirichlet) :
+  multiplicative f -> multiplicative g -> multiplicative (f * g).
+Proof.
+move=> fm gm [|n] m.
+  rewrite /coprime gcd0n => /eqP ->.
+  rewrite mul0r.
+STOP.
+Search gcdn 0%N.
+m nm.
+rewrite !dirichlet_mulE_dvdn.
+
 End Dirichlet.
 
 HB.instance Definition _ (R : comRingType) := GRing.Zmodule.on (dirichlet R).
 
 Section DirichletUnit.
-Variable (R : comUnitRingType).
+(* TODO weaken to rings with decidable divisibility. *)
+Variable (R : fieldType).
 
 Notation dirichlet := (dirichlet R).
 
+(* N.B. This definition is compatible with the weakening to comUnitRingType but
+  the actual second hypothesis should be (f 0 + f 1 %| f 0) in a ring with
+  decidable divisibility. *)
 Definition dirichlet_unit (f : dirichlet) := 
   (f 1 \is a GRing.unit) && (f 0 + f 1 \is a GRing.unit).
 
@@ -349,7 +390,7 @@ Fixpoint dirichlet_inv_subdef (f : dirichlet) (s : seq R) n :=
     let s := dirichlet_inv_subdef f s n in
     match n with
     | 0 => (f 1)^-1
-    | n.+1 => - ((((fun k => s`_(n - k)) : dirichlet) * f) n.+1) / f 1
+    | n.+1 => - ((((fun k => (k <= n.+1)%:R * s`_(n.+1 - k)) : dirichlet) * f) n.+2) / f 1
     end :: s
   end.
 
@@ -359,16 +400,141 @@ Definition dirichlet_inv (f : dirichlet) (n : nat) :=
 Lemma dirichlet_mulVx :
   {in dirichlet_unit, left_inverse 1 dirichlet_inv (@GRing.mul dirichlet)}.
 Proof.
-move=> f funit; apply: funext => n.
+move=> f funit.
+have subproof n k : k <= n ->
+    (dirichlet_inv_subdef f [::] n)`_(n - k) = (dirichlet_inv_subdef f [::] k)`_0.
+  elim: n k => [|n IHn] k; first by rewrite leqn0 sub0n => /eqP ->.
+  rewrite [in LHS]/dirichlet_inv_subdef.
+  case: n IHn => [_|n IHn].
+    by rewrite leq_eqVlt ltnS leqn0 => /orP[] /eqP ->.
+  rewrite leq_eqVlt => /orP[/eqP ->|].
+    by rewrite subnn/=.
+  by rewrite ltnS => kn; rewrite subSn//= IHn.
+have dvdnF d n k : n.+1 < k -> (k * d)%N == n.+1 = false.
+  move=> nk; rewrite mulnC; apply/negP => /eqP /esym nE.
+  suff /dvdn_leq-/(_ erefl)/(leq_trans nk): (k %| n.+1) by rewrite ltnn.
+  by apply/dvdnP; exists d.
+apply: funext => -[|n].
+  rewrite [LHS]big_nat_recr//= !big_nat_recr//= big_geq//=.
+  rewrite big_geq//=.
+  under eq_bigl do rewrite mul1n.
+  rewrite big_nat1_eq/= !add0r /dirichlet_inv/= funit/=.
+  move: funit => /andP[] f1 f01.
+  rewrite -mulrDr invrM// mulrCA mulrC !mulrA divrr// mul1r.
+  by rewrite mulrC mulrN addNr.
 rewrite /dirichlet_inv.
 under [X in X * _]funext do rewrite funit.
-case: (ubnP n) => k.
-elim: k n => // n IHn k.
-rewrite ltnS leq_eqVlt => /orP[/eqP -> {k}|/IHn//].
+move: funit => /andP[] f1 f01.
+rewrite [LHS]big_nat_recr//= addrC.
+under eq_bigl do rewrite dvdnF//.
+rewrite big_pred0// add0r.
+rewrite big_nat_recr//= addrC.
+under eq_bigl do rewrite mulnC -eqn_div// divnn/=.
+rewrite big_nat1_eq/= [X in X * _]/nth/=.
+case: n => [|n] /=.
+  rewrite mulVr// big_nat1.
+  by rewrite big_pred0// addr0.
+rewrite -mulrA mulVr// mulr1.
+under [X in - X]eq_bigr => d _.
+  set G := bigop _ _ _.
+  have -> : G = if d <= n.+1 then G else 0.
+    case: (leqP d n.+1) => //; rewrite ltnNge => /negPf dn.
+    rewrite /G.
+    under eq_bigr do rewrite dn mul0r mul0r.
+    by rewrite big1.
+  rewrite -ltnS /G.
+  over.
+rewrite -big_mkcond/= -(big_nat_widen _ _ _ xpredT); last first.
+  by rewrite !ltnS -addn2 leq_addr.
+rewrite big_nat.
+under eq_bigr => d/= dn.
+  under eq_bigr => d0 _.
+    rewrite ltnS in dn.
+    rewrite dn mul1r [X in X * _]subproof//.
+    over.
+  over.
+rewrite -big_nat -sumrN -big_split/=.
+under eq_bigr => d _.
+  rewrite -sumrN -big_split/=.
+  under eq_bigr do rewrite addNr.
+  rewrite big1//.
+  over.
+rewrite big1//.
+Qed.
 
+Lemma dirichlet_unitPl (f g : dirichlet) : g * f = 1 -> dirichlet_unit f.
+Proof.
+rewrite funeqE => gf.
+have: (f 1 \in GRing.unit) /\ (g 1 \in GRing.unit).
+  move: (gf 1).
+  rewrite [LHS]big_nat_recr//= !big_nat_recr//= big_geq//=.
+  under eq_bigl do rewrite mul0n.
+  rewrite big_pred0//.
+  under eq_bigl do rewrite mul1n.
+  rewrite big_nat1_eq/=.
+  under eq_bigl => d.
+    have -> : (2 * d)%N == 1 = false.
+      apply/negP => /eqP /esym d2.
+      suff: (2 %| 1)%N by [].
+      by apply/dvdnP; exists d; rewrite mulnC.
+    over.
+  rewrite big1// !add0r addr0 => gf1.
+  split; apply/unitrPr; last by exists (f 1).
+  by exists (g 1); rewrite mulrC.
+move=> [] f1 g1; apply/andP; split=> //.
+(* TODO: This is where we need to change the definition of `unit` to generalise
+   to rings with decidable divisibility *)
+rewrite unitfE; apply/eqP => f01.
+move: (gf 0).
+rewrite [LHS]big_nat_recr//= big_nat1.
+under [X in _ + X]eq_bigl do rewrite mul1n.
+rewrite big_nat1_eq/= big_nat_recr//= big_nat1.
+rewrite -mulrDr f01 mulr0 add0r => /eqP.
+rewrite mulf_eq0.
+move: g1; rewrite unitfE => /negPf -> /= /eqP f0.
+move: f01; rewrite f0 add0r => f10.
+by move: f1; rewrite f10 unitfE eqxx.
+Qed.
 
-  mulVx : {in unit, left_inverse 1 inv *%R};
-  unitPl : forall x y, y * x = 1 -> unit x;
-  invr_out : {in [predC unit], inv =1 id}
+Lemma dirichlet_invr_out : {in [predC dirichlet_unit], dirichlet_inv =1 id}.
+Proof.
+move=> f; rewrite inE => /negPf f1.
+rewrite /dirichlet_inv.
+by under [LHS]funext do rewrite f1.
+Qed.
+
+HB.instance Definition _ := GRing.ComNzRing_hasMulInverse.Build dirichlet 
+  dirichlet_mulVx dirichlet_unitPl dirichlet_invr_out.
+
+Lemma dirichletVcst1E n : ((fun n => (n != 0)%:R) : dirichlet)^-1 n =
+  match primes n with
+  | [::] => (n == 1)%:R
+  | [:: p] => (-1) ^+ (logn p n)
+  | _ => 0
+  end.
+Proof.
+have f1: ((fun n0 : nat => (n0 != 0)%:R) : dirichlet.dirichlet R) \in GRing.unit.
+  apply/andP/andP; rewrite eqxx add0r andbb oner_neq0.
+  exact: unitr1.
+move: n; rewrite -/(_ =1 _) -funeqE.
+apply/esym/(mulrI f1); rewrite divrr//.
+apply: funext => n.
+rewrite [LHS]big_nat_recl//.
+under eq_bigr do rewrite mul0r.
+rewrite big1// add0r.
+under eq_bigr do under eq_bigr do rewrite mul1r.
+case: n => [|n].
+  rewrite big_nat1.
+  under eq_bigl do rewrite mul1n.
+  by rewrite big_nat1_eq.
+
+rewrite /injective.
+Set Printing All.
+apply.
+Search GRing.inv GRing.mul.
+case pn: (primes n).
+  move: pn => /eqP; rewrite primes_eq0.
+  rewrite ltnS leq_eqVlt ltnS leqn0 => /orP[] /eqP ->.
+Search primes nil.
 
 End DirichletUnit.
