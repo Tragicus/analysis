@@ -158,7 +158,7 @@ Proof. exact: Num.Theory.lt_succ_floor. Qed.
 
 #[deprecated(since="mathcomp-analysis 1.3.0", note="use `Num.Theory.le_ceil` instead")]
 Lemma ceil_ge x : x <= (Num.ceil x)%:~R.
-Proof. exact: Num.Theory.ceil_ge. Qed.
+Proof. exact: Num.Theory.le_ceil. Qed.
 
 #[deprecated(since="mathcomp-analysis 1.3.0", note="use `Num.Theory.ceil_le_int`")]
 Lemma ceil_ge_int x (z : int) : (x <= z%:~R) = (Num.ceil x <= z).
@@ -331,7 +331,7 @@ by move=> ?; rewrite [RHS]real_ltNge ?realz -?real_floor_ge_int_tmp -?ltNge.
 Qed.
 
 Lemma le_floor : {homo (@Num.floor R) : x y / x <= y}.
-Proof. exact: le_floor. Qed.
+Proof. exact: floor_le. Qed.
 
 Lemma real_floor_eq x n : x \is Num.real ->
   (Num.floor x == n) = (n%:~R <= x < (n + 1)%:~R).
