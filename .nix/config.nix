@@ -45,7 +45,7 @@ in {
 
   ## select an entry to build in the following `bundles` set
   ## defaults to "default"
-  default-bundle = "9.0";
+  default-bundle = "9.1";
 
   ## write one `bundles.name` attribute set per
   ## alternative configuration
@@ -77,9 +77,14 @@ in {
   bundles."9.1" = {
     rocqPackages = {
       rocq-core.override.version = "9.1";
+      rocq-elpi.override.version = "Tragicus:unif_red";
     };
     coqPackages = common-bundle // {
       coq.override.version = "9.1";
+      coq-elpi.override.version = "Tragicus:unif_red";
+      mathcomp.override.version = "Tragicus:master";
+      mathcomp-bigenough.override.version = "master";
+      mathcomp-finmap.override.version = "master";
       ssprove.job = false;  # not yet available for 9.1
     };
   };
@@ -88,14 +93,12 @@ in {
     rocqPackages = {
       rocq-core.override.version = "master";
       stdlib.override.version = "master";
-      rocq-elpi.override.version = "master";
       rocq-elpi.override.elpi-version = "3.0.1";
       hierarchy-builder.override.version = "master";
     };
     coqPackages = common-bundle // {
       coq.override.version = "master";
       stdlib.override.version = "master";
-      coq-elpi.override.version = "master";
       coq-elpi.override.elpi-version = "3.0.1";
       hierarchy-builder.override.version = "master";
       mathcomp.override.version = "master";

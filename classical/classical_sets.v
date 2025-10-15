@@ -397,6 +397,8 @@ HB.instance Definition _ (T : eqType) (A : set T) := [Equality of A by <:].
 HB.instance Definition _ (T : choiceType) (A : set T) := [Choice of A by <:].
 HB.instance Definition _ (T : countType) (A : set T) := [Countable of A by <:].
 HB.instance Definition _ (T : finType) (A : set T) := [Finite of A by <:].
+HB.instance Definition _ d (T : preorderType d) (A : set T) :=
+  [SubChoice_isSubPreorder of (@memType T A) by <: with d].
 HB.instance Definition _ d (T : porderType d) (A : set T) :=
   [SubChoice_isSubPOrder of (@memType T A) by <: with d].
 HB.instance Definition _ d (T : orderType d) (A : set T) :=
@@ -816,7 +818,6 @@ Proof. exact: (@Order.MeetTheory.meetAC _ (set T)). Qed.
 
 Lemma setIACA : @interchange (set T) setI setI.
 Proof. exact: (@Order.MeetTheory.meetACA _ (set T)). Qed.
->>>>>>> 7de0cc7d (redefine sets (wip))
 
 Lemma setIIl A B C : A `&` B `&` C = (A `&` C) `&` (B `&` C).
 Proof. by rewrite setIA !(setIAC _ C) -(setIA _ C) setIid. Qed.
@@ -3220,11 +3221,9 @@ Qed.
  *)
 
 End partitions.
-(* TODO
 #[deprecated(note="Use trivIset_setIl instead")]
 Notation trivIset_setI := trivIset_setIl (only parsing).
- *)
- *)
+
 (*TODO: What is this?
 Definition maximal_disjoint_subcollection T I (F : I -> set T) (A B : set I) :=
   [/\ A `<=` B, trivIset A F & forall C,
@@ -3254,168 +3253,6 @@ Qed.
 
 End maximal_disjoint_subcollection.
  *)
-Section UpperLowerTheory.
-Import Order.TTheory.
-Variables (d : Order.disp_t) (T : porderType d).
-Implicit Types (A : set T) (x y z : T).
-
-Definition ubound A : set T := [set y | `[< forall x : A, (val x <= y)%O >]].
-Definition lbound A : set T := [set y | `[< forall x : A, (y <= val x)%O >]].
-
-Lemma ubP A x : reflect (forall y : A, (val y <= x)%O) (x \in ubound A).
-Proof. exact: asboolP. Qed.
-
-Lemma lbP A x : reflect (forall y : A, (x <= y)%O) (x \in lbound A).
-Proof. exact: asboolP. Qed.
-
-Lemma ub_set1 x y : y \in ubound [set x] = (x <= y)%O.
-Proof. by apply/ubP/idP => [/(_ x)//|+ [] _/= /eqP ->]. Qed.
-
-Lemma lb_set1 x y : y \in lbound [set x] = (x >= y)%O.
-Proof. by apply/lbP/idP => [/(_ x)//|+ [] _/= /eqP ->]. Qed.
-
-Lemma lb_ub_set1 x y : y \in lbound (ubound [set x]) = (y <= x)%O.
-Proof.
-have xub: x \in ubound [set x] by rewrite ub_set1.
-by apply/lbP/idP => [/(_ x)//|yx [] z/= /ubP /(_ x)/=]; apply: le_trans.
-Qed.
-
-Lemma ub_lb_set1 x y : y \in ubound (lbound [set x]) = (x <= y)%O.
-Proof.
-have xlb: x \in lbound [set x] by rewrite lb_set1.
-by apply/ubP/idP => [/(_ x)//|yx [] z/= /lbP /(_ x)/= /le_trans]; apply.
-Qed.
-
-Lemma lb_ub_refl x : x \in lbound (ubound [set x]).
-Proof. by apply/lbP => -[]/= y; rewrite ub_set1. Qed.
-
-Lemma ub_lb_refl x : x \in ubound (lbound [set x]).
-Proof. by apply/ubP => -[]/= y; rewrite lb_set1. Qed.
-
-Lemma subset_lb_ub A : A `<=` (lbound (ubound A)).
-Proof. by apply/subsetP => x xA; apply/lbP => -[]/= y /ubP/(_ x). Qed.
-
-Lemma subset_ub_lb A : A `<=` (ubound (lbound A)).
-Proof. by apply/subsetP => x xA; apply/ubP => -[]/= y /lbP/(_ x). Qed.
-
-(* TOTHINK: The definition of `lbound` is more general than this.
-Lemma ub_lb_ub A x y : ubound A y -> lbound (ubound A) x -> (x <= y)%O.
-Proof. by move=> Ay; apply. Qed.
-
-Lemma lb_ub_lb A x y : lbound A y -> ubound (lbound A) x -> (y <= x)%O.
-Proof. by move=> Ey; apply. Qed.
- *)
-
-(* down set (i.e., generated order ideal) *)
-(* i.e. down A := { x | exists y, y \in A /\ x <= y} *)
-Definition down A : set T := [set x | `[< exists y : A, (x <= val y)%O >]].
-
-Definition has_ubound A := ubound A !=set0.
-Definition has_lbound A := lbound A !=set0.
-(* TOTHINK: This is not the definition of sup...
-Definition has_sup A := A !=set0 /\ has_ubound A.
-Definition has_inf A := A !=set0 /\ has_lbound A.
-
-Lemma has_ub_set1 x : has_ubound [set x].
-Proof. by exists x; rewrite ub_set1. Qed.
-
-Lemma has_inf0 : ~ has_inf (@set0 T).
-Proof. by rewrite /has_inf not_andP; left; apply/set0P/negP/negPn. Qed.
-
-Lemma has_sup0 : ~ has_sup (@set0 T).
-Proof. by rewrite /has_sup not_andP; left; apply/set0P/negP/negPn. Qed.
-
-Lemma has_sup1 x : has_sup [set x].
-Proof. by split; [exists x | exists x => y ->]. Qed.
-
-Lemma has_inf1 x : has_inf [set x].
-Proof. by split; [exists x | exists x => y ->]. Qed.
-
-Lemma subset_has_lbound A B : A `<=` B -> has_lbound B -> has_lbound A.
-Proof. by move=> AB [l Bl]; exists l => a Aa; apply/Bl/AB. Qed.
-
-Lemma subset_has_ubound A B : A `<=` B -> has_ubound B -> has_ubound A.
-Proof. by move=> AB [l Bl]; exists l => a Aa; apply/Bl/AB. Qed.
- *)
-
-Lemma downP A x : reflect (exists y : A, (x <= y)%O) (x \in down A).
-Proof. exact: asboolP. Qed.
-
-(* TOTHINK: Is this interesting?
-Definition isLub A m := m \in ubound A /\ forall b, ubound A b -> (m <= b)%O.
- *)
-
-Definition supremums A := ubound A `&` lbound (ubound A).
-
-Lemma supremums1 x : supremums [set x] = [set x].
-Proof. by apply/eqP/seteqP => y; rewrite in_setI ub_set1 lb_ub_set1 -eq_le. Qed.
-
-Lemma is_subset1_supremums A : is_subset1 (supremums A).
-Proof.
-move=> x y; apply/val_inj/le_anti.
-by case: x y => /= x /andP[] xu /lbP + [] /= y /andP[] yu /lbP/(_ x) => /(_ y)/= ->.
-Qed.
-
-Definition supremum x0 A := xget x0 (supremums A).
-
-Lemma supremumP x0 A :
-  reflect (supremums A !=set0) (supremum x0 A \in supremums A).
-Proof. exact: xgetP. Qed.
-
-Lemma supremum_out x0 A : supremums A = set0 -> supremum x0 A = x0.
-Proof. by rewrite /supremum => ->; apply: xget0. Qed.
-
-Lemma supremum1 x0 x : supremum x0 [set x] = x.
-Proof. by rewrite /supremum supremums1 xget1. Qed.
-
-Definition infimums A := lbound A `&` ubound (lbound A).
-
-Lemma infimums1 x : infimums [set x] = [set x].
-Proof. by apply/eqP/seteqP => y; rewrite in_setI lb_set1 ub_lb_set1 -eq_le. Qed.
-
-Lemma is_subset1_infimums A : is_subset1 (infimums A).
-Proof.
-move=> x y; apply/val_inj/le_anti.
-by case: x y => /= x /andP[] xu /ubP + [] /= y /andP[] yu /ubP/(_ x)/= -> => /(_ y). 
-Qed.
-
-Definition infimum x0 A := xget x0 (infimums A).
-
-Lemma infimumP x0 A :
-  reflect (infimums A !=set0) (infimum x0 A \in infimums  A).
-Proof. exact: xgetP. Qed.
-
-Lemma infimum_out x0 A : infimums A = set0 -> infimum x0 A = x0.
-Proof. by rewrite /infimum => ->; apply: xget0. Qed.
-
-Lemma infimum1 x0 x : infimum x0 [set x] = x.
-Proof. by rewrite /infimum infimums1 xget1. Qed.
-
-End UpperLowerTheory.
-
-Section UpperLowerOrderTheory.
-Import Order.TTheory.
-Variables (d : Order.disp_t) (T : orderType d).
-Implicit Types (A : set T) (x y z : T).
-
-Lemma ge_supremum_Nmem x0 A (t : A) :
-  supremums A !=set0 -> (supremum x0 A >= val t)%O.
-Proof. by move=> /supremumP => /(_ x0)/andP[]/ubP/(_ t). Qed.
-
-Lemma le_infimum_Nmem x0 A (t : A) :
-  infimums A !=set0 -> (infimum x0 A <= t)%O.
-Proof. by move=> /infimumP => /(_ x0)/andP[]/lbP/(_ t). Qed.
-
-End UpperLowerOrderTheory.
-
-Lemma nat_supremums_neq0 (A : set nat) : ubound A !=set0 -> supremums A !=set0.
-Proof.
-case=> n nub.
-case: (@arg_minnP _ ord_max (fun n : 'I_n.+1 => val n \in ubound A) (fun n => n) nub).
-move=> m mA mle; exists (val m); apply/andP; split=> //; apply/lbP => k.
-case: (leqP k n); last apply/leq_trans/ltnW/(valP m); rewrite -ltnS => kn.
-exact: (mle (Ordinal kn) (valP k)).
-Qed.
 
 (* TOTHINK: What is this?
 Definition meets T (F G : set (set T)) :=
