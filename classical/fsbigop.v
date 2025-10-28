@@ -36,139 +36,141 @@ Notation "\big [ op / idx ]_ ( i '\in' A ) F" :=
     (only parsing) : big_scope.
 
 Lemma finite_index_key : unit. Proof. exact: tt. Qed.
-Definition finite_support {I : choiceType} {T : Type} (idx : T) (D : set I)
+Definition finite_support {I : choiceType} {T : eqType} (idx : T) (D : set I)
     (F : I -> T) : seq I :=
   locked_with finite_index_key (fset_set (D `&` F @^-1` [set~ idx] : set I)).
 Notation "\big [ op / idx ]_ ( i '\in' D ) F" :=
     (\big[op/idx]_(i <- finite_support idx D (fun i => F)) F)
   : big_scope.
 
-Lemma in_finite_support (T : Type) (J : choiceType) (i : T) (P : set J)
-    (F : J -> T) : finite_set (P `&` F @^-1` [set~ i]) ->
+Lemma in_finite_support (T : eqType) (J : choiceType) (i : T) (P : set J)
+    (F : J -> T) : finite (P `&` F @^-1` [set~ i]) ->
   finite_support i P F =i P `&` F @^-1` [set~ i].
 Proof. by move=> finF j; rewrite /finite_support unlock in_fset_set. Qed.
 
-Lemma finite_support_uniq (T : Type) (J : choiceType) (i : T) (P : set J)
+Lemma finite_support_uniq (T : eqType) (J : choiceType) (i : T) (P : set J)
     (F : J -> T) : uniq (finite_support i P F).
 Proof. by rewrite /finite_support unlock; exact: fset_uniq. Qed.
 #[global] Hint Resolve finite_support_uniq : core.
 
-Lemma no_finite_support (T : Type) (J : choiceType) (i : T) (P : set J)
-    (F : J -> T) : infinite_set (P `&` F @^-1` [set~ i]) ->
+Lemma no_finite_support (T : eqType) (J : choiceType) (i : T) (P : set J)
+    (F : J -> T) : infinite (P `&` F @^-1` [set~ i]) ->
   finite_support i P F = [::].
 Proof.
 move=> infinF; rewrite /finite_support unlock.
 by rewrite /fset_set/=; case: pselect => //.
 Qed.
 
-Lemma eq_finite_support {I : choiceType} {T : Type} (idx : T) (D : set I)
+Lemma eq_finite_support {I : choiceType} {T : eqType} (idx : T) (D : set I)
     (F G : I -> T) : {in D, F =1 G} ->
   finite_support idx D F = finite_support idx D G.
 Proof.
 by move=> eqFG; rewrite /finite_support !unlock// (eq_preimage _ eqFG).
 Qed.
 
-Variant finite_support_spec R (T : choiceType)
+Variant finite_support_spec (R : eqType) (T : choiceType)
   (P : set T) (F : T -> R) (idx : R) : seq T -> Type :=
-| NoFiniteSupport of infinite_set (P `&` F @^-1` [set~ idx]) :
+| NoFiniteSupport of infinite (P `&` F @^-1` [set~ idx]) :
     finite_support_spec P F idx [::]
 | FiniteSupport (X : {fset T}) of [set` X] `<=` P
-   & (forall i, P i -> i \notin X -> F i = idx)
+   & (forall i : P, val i \notin X -> F i = idx)
    & [set` X] = (P `&` F @^-1` [set~ idx]) :
     finite_support_spec P F idx X.
 
-Lemma finite_supportP R (T : choiceType) (P : set T) (F : T -> R) (idx : R) :
+Lemma finite_supportP (R : eqType) (T : choiceType) (P : set T) (F : T -> R) (idx : R) :
   finite_support_spec P F idx (finite_support idx P F).
 Proof.
 rewrite /finite_support unlock/= /fset_set.
 case: pselect=> // Xfin; last by constructor.
-case: cid => //= X eqX; constructor; rewrite -?eqX//.
-move=> i Pi NXi /=; have : (P `\` [set` X]) i by split=> //=; apply/negP.
-by rewrite -eqX /= => -[_]; apply: contra_notP.
+case: cid => //= X eqX; constructor; rewrite -?eqX ?range_val//.
+move=> i NXi /=; have : val i \in (P `\` [set` X]) by apply/andP; split.
+rewrite -eqX range_val /= => /andP[_]/negP; apply: contra_notP => Fi.
+by apply/andP; split=> //; apply/eqP.
 Qed.
 
 Notation "\sum_ ( i '\in' A ) F" := (\big[+%R/0%R]_(i \in A) F) : ring_scope.
 
-Lemma eq_fsbigl (R : Type) (idx : R) (op : R -> R -> R)
+Lemma eq_fsbigl (R : eqType) (idx : R) (op : R -> R -> R)
     (T : choiceType) (f : T -> R) (P Q : set T) :
   P = Q -> \big[op/idx]_(x \in P) f x = \big[op/idx]_(x \in Q) f x.
 Proof. by move=> ->. Qed.
 
-Lemma eq_fsbigr (R : Type) (idx : R) (op : Monoid.com_law idx)
+Lemma eq_fsbigr (R : eqType) (idx : R) (op : Monoid.com_law idx)
     (T : choiceType) (f g : T -> R) (P : set T) :
   {in P, f =1 g} -> (\big[op/idx]_(x \in P) f x = \big[op/idx]_(x \in P) g x).
 Proof.
 move=> fg; rewrite (eq_finite_support _ fg); apply: eq_big_seq => x.
-by case: finite_supportP => //= X XP _ gidx xX; rewrite fg // ?inE; apply/XP.
+by case: finite_supportP => //= X /subsetP XP _ gidx xX; rewrite [LHS]fg //; apply/XP.
 Qed.
 Arguments eq_fsbigr {R idx op T f} g.
 
-Lemma fsbigTE (R : Type) (idx : R) (op : Monoid.com_law idx) (T : choiceType)
+Lemma fsbigTE (R : eqType) (idx : R) (op : Monoid.com_law idx) (T : choiceType)
     (A : {fset T}) (f : T -> R) :
     (forall i, i \notin A -> f i = idx) ->
   \big[op/idx]_(i \in [set: T]) f i = \big[op/idx]_(i <- A) f i.
 Proof.
-elim/Peq: R => R in idx op f *.
-move=> Af; have Afin : finite_set (f @^-1` [set~ idx]).
-  by apply: (finite_subfset A) => x; apply: contra_notT => /Af.
+move=> Af; have Afin : finite (f @^-1` [set~ idx]).
+  apply/(card_le_finite _ (finite_subfset A))/subset_card_le/subsetP => x /negP.
+  by apply: contra_notT => /Af/eqP.
 rewrite [in RHS](big_fsetID _ [pred x | f x == idx])/=.
 rewrite [X in _ = op X _]big_fset [X in _ = op X _]big1 ?Monoid.simpm//; last first.
   by move=> i /= /eqP.
 apply eq_fbigl => r.
 rewrite in_finite_support// ?setTI// /preimage/=; apply/idP/idP => /=.
-  rewrite !inE/=; apply: contra_notP => /negP.
+  move=> /eqP; rewrite !inE/=; apply: contra_notP => /negP.
   by rewrite negb_and negbK => /orP[|/eqP//]; exact: Af.
-by rewrite !inE/= => /andP[_ /eqP].
+by rewrite !inE/= => /andP[_].
 Qed.
 Arguments fsbigTE {R idx op T} A f.
 
-Lemma fsbig_mkcond (R : Type) (idx : R) (op : Monoid.com_law idx)
+Lemma fsbig_mkcond (R : eqType) (idx : R) (op : Monoid.com_law idx)
     (T : choiceType) (A : set T) (f : T -> R) :
   \big[op/idx]_(i \in A) f i =
-  \big[op/idx]_(i \in [set: T]) patch (fun=> idx) A f i.
+  \big[op/idx]_(i \in T) if i \in A then f i else idx.
 Proof.
-elim/Peq: R => R in idx op f *.
 rewrite -big_mkcond/= -[in RHS]big_filter; apply: perm_big.
-rewrite uniq_perm ?filter_uniq//= => i; rewrite mem_filter.
+apply: uniq_perm => //; first exact: filter_uniq.
+move=> i; rewrite mem_filter.
 set g := fun i => if i \in A then f i else idx.
 have gAf : setT `&` g @^-1` [set~ idx] = (A `&` f @^-1` [set~ idx]).
-  rewrite setTI; apply/predeqP => x; split; rewrite /preimage/g/=.
-    by case: ifPn; rewrite (inE, notin_setE).
-  by case: ifPn; rewrite (inE, notin_setE) => ? [].
+  rewrite setTI; apply/eqP/seteqP => x; apply/idP/andP => [/eqP|[] xA /eqP]; rewrite /g/=.
+    by case: ifPn => // _ /eqP.
+  by rewrite in_mkset xA => /eqP.
 case: finite_supportP => //.
   rewrite -gAf; case: finite_supportP=> //=; first by rewrite ?inE andbF.
-  by move=> X _ gidx <-//.
-move=> X XA fidx XE; case: finite_supportP; rewrite gAf -?XE//=.
-move=> Y _ gidx /predeqP/=/(_ _)/propext YX.
+  by move=> X _ gidx <- /(_ (finite_subfset _)).
+move=> X /subsetP XA fidx XE; case: finite_supportP; rewrite gAf -?XE.
+  by move=> /(_ (finite_subfset _)).
+move=> Y _ gidx /eqP/seteqP/= YX.
 by apply/idP/andP => [|[]]; rewrite YX// inE => Xi; split=> //; apply: XA.
 Qed.
 
-Lemma fsbig_mkcondr (R : Type) (idx : R) (op : Monoid.com_law idx)
+Lemma fsbig_mkcondr (R : eqType) (idx : R) (op : Monoid.com_law idx)
     (T : choiceType) (I J : set T) (a : T -> R) :
   \big[op/idx]_(i \in I `&` J) a i =
   \big[op/idx]_(i \in I) if i \in J then a i else idx.
 Proof.
 rewrite fsbig_mkcond [RHS]fsbig_mkcond.
-by under eq_fsbigr do rewrite patch_setI.
+by under eq_fsbigr do rewrite if_and.
 Qed.
 
-Lemma fsbig_mkcondl (R : Type) (idx : R) (op : Monoid.com_law idx)
+Lemma fsbig_mkcondl (R : eqType) (idx : R) (op : Monoid.com_law idx)
     (T : choiceType) (I J : set T) (a : T -> R) :
   \big[op/idx]_(i \in I `&` J) a i =
   \big[op/idx]_(i \in J) if i \in I then a i else idx.
-Proof.
-rewrite fsbig_mkcond [RHS]fsbig_mkcond setIC.
-by under eq_fsbigr do rewrite patch_setI.
-Qed.
+Proof. by rewrite setIC fsbig_mkcondr. Qed.
 
-Lemma bigfs (R : Type) (idx : R) (op : Monoid.com_law idx) (T : choiceType)
+(*
+Lemma bigfs (R : eqType) (idx : R) (op : Monoid.com_law idx) (T : choiceType)
     (r : seq T) (P : {pred T}) (f : T -> R) : uniq r ->
     (forall i, P i -> i \notin r -> f i = idx) ->
   \big[op/idx]_(i <- r | P i) f i = \big[op/idx]_(i \in [set` P]) f i.
 Proof.
 move=> r_uniq fidx; rewrite fsbig_mkcond.
-rewrite (fsbigTE [fset x | x in r]%fset); last first.
-  by move=> i; rewrite inE/= /patch mem_setE; case: ifP=> // + /fidx->.
+rewrite [RHS](fsbigTE [fset x | x in r]%fset); last first.
+  move=> i; rewrite !in_mkset/=; case: ifP => // /fidx.
+  Search mem_seq ([fset _ | _ in _])%fset.
+  rewrite in_mkset.
 rewrite -big_mkcond; under [RHS]eq_bigl do rewrite mem_setE.
 by apply: perm_big; rewrite uniq_perm// => i; rewrite !inE.
 Qed.
@@ -193,37 +195,40 @@ Proof.
 move=> ur; rewrite (fsbigE r)//=; last by move=> + ->.
 by rewrite mem_setE big_seq_cond big_mkcondr.
 Qed.
+ *)
 
-Lemma fsbig1 (R : Type) (idx : R) (op : Monoid.law idx) (I : choiceType)
+Lemma fsbig1 (R : eqType) (idx : R) (op : Monoid.law idx) (I : choiceType)
     (P : set I) (F : I -> R) :
-  (forall i, P i -> F i = idx) -> \big[op/idx]_(i \in P) F i = idx.
+  (forall i : P, F i = idx) -> \big[op/idx]_(i \in P) F i = idx.
 Proof.
-move=> PF0; rewrite big1_seq// => i/=; case: finite_supportP=> //=.
-by move=> X XP _ _ Xi; rewrite PF0//; apply/XP.
+move=> PF0; rewrite [LHS]big1_seq// => i/=; case: finite_supportP=> //=.
+by move=> X /subsetP XP _ _ Xi; rewrite [LHS]PF0//; apply/XP.
 Qed.
 
-Lemma fsbig_dflt (R : Type) (idx : R) (op : Monoid.law idx) (I : choiceType)
+Lemma fsbig_dflt (R : eqType) (idx : R) (op : Monoid.law idx) (I : choiceType)
     (P : set I) (F : I -> R) :
-  infinite_set (P `&` F @^-1` [set~ idx])-> \big[op/idx]_(i \in P) F i = idx.
-Proof. by case: finite_supportP; rewrite ?big_nil// => X _ _ <-. Qed.
+  infinite (P `&` F @^-1` [set~ idx])-> \big[op/idx]_(i \in P) F i = idx.
+Proof. by case: finite_supportP; rewrite ?big_nil// => X _ _ <- /(_ (finite_subfset _)). Qed.
 
-Lemma fsbig_widen (T : choiceType) [R : Type] [idx : R]
+Lemma fsbig_widen (T : choiceType) [R : eqType] [idx : R]
     (op : Monoid.com_law idx) (P D : set T) (f : T -> R) :
     P `<=` D ->
     D `\` P `<=` f @^-1` [set idx] ->
   \big[op/idx]_(i \in P) f i = \big[op/idx]_(i \in D) f i.
 Proof.
-move=> PD DPf; rewrite fsbig_mkcond [RHS]fsbig_mkcond.
-apply: eq_fsbigr => x _; rewrite /patch; case: ifPn; rewrite (inE, notin_setE).
-  by move=> Px; rewrite ifT// inE; apply: PD.
-by move=> Px; case: ifP => //; rewrite inE => Dx; rewrite DPf.
+move=> /subsetP PD /subsetP DPf; rewrite fsbig_mkcond [RHS]fsbig_mkcond.
+apply: eq_fsbigr => x _; case: ifPn => [/PD ->//|Px].
+by case: ifP => // Dx; apply/esym/eqP/DPf/andP; split.
 Qed.
 Arguments fsbig_widen {T R idx op} P D f.
 
-Lemma fsbig_supp (T : choiceType) [R : Type] [idx : R]
+Lemma fsbig_supp (T : choiceType) [R : eqType] [idx : R]
     (op : Monoid.com_law idx) (P : set T) (f : T -> R) :
   \big[op/idx]_(i \in P) f i = \big[op/idx]_(i \in P `&` f @^-1` [set~ idx]) f i.
-Proof. by apply/esym/fsbig_widen => // x [Px /not_andP[]//=]; rewrite notK. Qed.
+Proof.
+apply/esym/fsbig_widen => //; apply/subsetP => x /andP[xP].
+by rewrite in_mkset negb_and xP/= negbK.
+Qed.
 
 Lemma fsbig_fwiden (T : choiceType) [R : eqType] [idx : R]
     (op : Monoid.com_law idx)

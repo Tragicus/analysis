@@ -21,11 +21,11 @@ From mathcomp Require Import mathcomp_extra boolp classical_sets functions.
 (*           A #>= B := B #<= A                                               *)
 (*            A #= B == the cardinal of A is equal to the cardinal of B       *)
 (*           A #!= B := ~~ (A #= B)                                           *)
-(*      finite_set A == the set A is finite                                   *)
+(*      finite A == the set A is finite                                   *)
 (*                   := exists n, A #= `I_n                                   *)
 (*                   <-> exists X : {fset T}, A = [set` X]                    *)
 (*                   <-> ~ ([set: nat] #<= A)                                 *)
-(*    infinite_set A := ~ finite_set A                                        *)
+(*    infinite A := ~ finite A                                        *)
 (*       countable A <-> A is countable                                       *)
 (*                   := A #<= [set: nat]                                      *)
 (*        fset_set A == the finite set corresponding if A : set T is finite,  *)
@@ -56,31 +56,35 @@ Declare Scope card_scope.
 Delimit Scope card_scope with card.
 Local Open Scope card_scope.
 
-Definition card_le T U (A : set T) (B : set U) :=
-  `[< $|{injfun [set: A] >-> [set: B]}| >].
+Definition card_le T U :=
+  `[< $|{inj T >-> U}| >].
 Notation "A '#<=' B" := (card_le A B) : card_scope.
 Notation "A '#>=' B" := (card_le B A) (only parsing) : card_scope.
 
-Definition card_eq T U (A : set T) (B : set U) :=
-  `[< $|{bij [set: A] >-> [set: B]}| >].
+Definition card_eq T U :=
+  `[< $|{splitbij T >-> U}| >].
 Notation "A '#=' B" := (card_eq A B) : card_scope.
 Notation "A '#!=' B" := (~~ (card_eq A B)) : card_scope.
 
-Definition finite_set {T} (A : set T) := exists n, A #= `I_n.
-Notation infinite_set A := (~ finite_set A).
+Definition finite T := exists n, T #= `I_n.
+Notation infinite T := (~ finite T).
 
-Lemma injPex {T U} {A : set T} :
-   $|{inj A >-> U}| <-> exists f : T -> U, set_inj A f.
+Lemma injPex {T U} :
+   $|{inj T >-> U}| <-> exists f : T -> U, injective f.
 Proof. by split=> [[f]|[_ /Pinj[f _]]]; first by exists f. Qed.
 
-Lemma surjPex {T U} {A : set T} {B : set U} :
-  $|{surj A >-> B}| <-> exists f, set_surj A B f.
-Proof. by split=> [[f]|[_ /Psurj[f _]]]; first by exists f. Qed.
+Lemma surjPex {T U} :
+  $|{surj T >-> U}| <-> exists f : T -> U, surjective f.
+Proof.
+split=> [[f]|[_ /Psurj[f _]]]; first by exists f; apply: surj.
+by move: (f : {surj _ >-> _}).
+Qed.
 
-Lemma bijPex {T U} {A : set T} {B : set U} :
-  $|{bij A >-> B}| <-> exists f, set_bij A B f.
-Proof. by split=> [[f]|[_ /Pbij[f _]]]; first by exists f. Qed.
+Lemma bijPex {T U} :
+  $|{splitbij T >-> U}| <-> exists f : T -> U, bijective f.
+Proof. by split=> [[f]|[_ /Pbij[f _]]]; first by exists f; apply: bij. Qed.
 
+(*
 Lemma surjfunPex {T U} {A : set T} {B : set U} :
   $|{surjfun A >-> B}| <-> exists f, B = f @` A.
 Proof.
@@ -91,14 +95,16 @@ Qed.
 Lemma injfunPex {T U} {A : set T} {B : set U}:
    $|{injfun A >-> B}| <-> exists2 f : T -> U, set_fun A B f & set_inj A f.
 Proof. by split=> [[f]|[_ /Pfun[? ->] /funPinj[f]]]; [exists f | squash f]. Qed.
+ *)
 
-Lemma card_leP {T U} {A : set T} {B : set U} :
-  reflect $|{injfun [set: A] >-> [set: B]}| (A #<= B).
+Lemma card_leP {T U} :
+  reflect $|{inj T >-> U}| (T #<= U).
 Proof. exact: asboolP. Qed.
 
-Lemma inj_card_le {T U} {A : set T} {B : set U} : {injfun A >-> B} -> (A #<= B).
-Proof. by move=> f; apply/card_leP; squash (sigLR f). Qed.
+Lemma inj_card_le {T U} : {inj T >-> U} -> (T #<= U).
+Proof. by move=> f; apply/card_leP. Qed.
 
+(*
 Lemma pcard_leP {T} {U : pointedType} {A : set T} {B : set U} :
    reflect $|{injfun A >-> B}| (A #<= B).
 Proof.
@@ -111,181 +117,259 @@ Proof.
 by apply: (iffP pcard_leP) => -[f]; [squash f | squash ('totalfun_A f)].
 Qed.
 
-Lemma pcard_injP {T} {U : pointedType} {A : set T} :
-  reflect (exists f : T -> U, {in A &, injective f}) (A #<= [set: U]).
-Proof. by apply: (iffP pcard_leTP); rewrite injPex. Qed.
-
-Lemma ppcard_leP {T U : pointedType} {A : set T} {B : set U} :
-   reflect $|{splitinjfun A >-> B}| (A #<= B).
-Proof. by apply: (iffP pcard_leP) => -[f]; squash (split f). Qed.
-
-Lemma card_ge0 T U (S : set U) : @set0 T #<= S.
-Proof. by apply/card_leP; squash set0fun. Qed.
-#[global] Hint Resolve card_ge0 : core.
-
-Lemma card_le0P T U (A : set T) : reflect (A = set0) (A #<= @set0 U).
+ *)
+Lemma card_injP {T} {U : Type} :
+  reflect (exists f : T -> U, injective f) (T #<= U).
 Proof.
-apply: (iffP idP) => [/card_leP[f]|->//].
-by rewrite -subset0 => a /mem_set aA; have [x /set_mem] := f (SigSub aA).
+apply: (iffP card_leP).
+  exact: injPex.1.
+exact: injPex.2.
 Qed.
 
-Lemma card_le0  T U (A : set T) : (A #<= @set0 U) = (A == set0).
-Proof. exact/card_le0P/eqP. Qed.
+Lemma pcard_leP {T : pointedType} {U : Type} :
+   reflect $|{splitinj T >-> U}| (T #<= U).
+Proof. apply: (iffP card_leP) => -[f]; squash (split f). Qed.
 
-Lemma card_eqP {T U} {A : set T} {B : set U} :
-  reflect $|{bij [set: A] >-> [set: B]}| (A #= B).
+Lemma card_eqP {T U} :
+  reflect $|{splitbij T >-> U}| (T #= U).
 Proof. exact: asboolP. Qed.
 
-Lemma pcard_eq {T U} {A : set T} {B : set U} : {bij A >-> B} -> A #= B.
-Proof. by move=> f; apply/card_eqP; squash (sigLR f). Qed.
+Lemma card_eqVP {T U} :
+   reflect $|{splitbij T >-> U}| (U #= T).
+Proof. by apply: (iffP card_eqP) => -[] f; squash f^-1. Qed.
 
-Lemma pcard_eqP {T} {U : pointedType} {A : set T} {B : set U} :
-   reflect $| {bij A >-> B} | (A #= B).
-Proof.
-by apply: (iffP card_eqP) => -[f]; [squash (valLR point f) | squash (sigLR f)].
-Qed.
-
-Lemma card_bijP {T U} {A : set T} {B : set U} :
-   reflect (exists f : A -> B, bijective f) (A #= B).
-Proof.
-by apply: (iffP card_eqP) => [[f]|[_ /PbijTT[f _]]]; [exists f|squash f].
-Qed.
-
-Lemma card_eqVP {T U} {A : set T} {B : set U} :
-   reflect $|{splitbij [set: A] >-> [set: B]}| (A #= B).
-Proof. by apply: (iffP card_bijP) => [[_ /PbijTT[f _]]//|[f]]; exists f. Qed.
-
-Lemma card_set_bijP {T} {U : pointedType} {A : set T} {B : set U} :
-   reflect (exists f, set_bij A B f) (A #= B).
-Proof.
-by apply: (iffP pcard_eqP) => [[f]|[_ /Pbij[f _]]]; [exists f|squash f].
-Qed.
-
-Lemma ppcard_eqP {T U : pointedType} {A : set T} {B : set U} :
-   reflect $| {splitbij A >-> B} | (A #= B).
-Proof. by apply: (iffP pcard_eqP) => -[f]; [squash (split f)|squash f]. Qed.
-
-Lemma card_eqxx T (A : set T) : A #= A.
-Proof. by apply/card_eqP; squash idfun. Qed.
-#[global] Hint Resolve card_eqxx : core.
-
-Lemma card_eq00 T U : @set0 T #= @set0 U.
-Proof.
-apply/card_eqP/squash; apply: @bijection_of_bijective set0fun _.
-by exists set0fun => -[x x0]; have := set_mem x0.
-Qed.
-#[global] Hint Resolve card_eq00 : core.
-
-Section empty1.
-Implicit Types (T : emptyType).
-Lemma empty_eq0 T : all_equal_to (set0 : set T).
-Proof. by move=> X; apply/setF_eq0/no. Qed.
-Lemma card_le_emptyl T U (A : set T) (B : set U) : A #<= B.
-Proof. by rewrite empty_eq0. Qed.
-Lemma card_le_emptyr T U (A : set T) (B : set U) : (B #<= A) = (B == set0).
-Proof. by rewrite empty_eq0; apply/idP/eqP=> [/card_le0P|->//]. Qed.
-
-Definition emptyE_subdef := (empty_eq0, card_le_emptyl, card_le_emptyr, eq_opE).
-End empty1.
-
-Theorem Cantor_Bernstein T U (A : set T) (B : set U) :
-  A #<= B -> B #<= A -> A #= B.
-Proof.
-elim/Ppointed: T => T in A *; first by rewrite !emptyE_subdef => _ ->.
-elim/Ppointed: U => U in B *; first by rewrite !emptyE_subdef => ->.
-suff {A B} card_eq (A B : set U) : B `<=` A -> A #<= B -> A #= B.
-  move=> /ppcard_leP[f] /ppcard_leP[g].
-  have /(_ _)/ppcard_eqP[|h] := card_eq _ _ (fun_image_sub f).
-    by apply/pcard_leP; squash ([fun f in A] \o g).
-  by apply/pcard_eqP; squash ((split h)^-1 \o [fun f in A]).
-move=> BA /ppcard_leP[u]; have uAB := 'funS_u.
-pose C_ := fix C n := if n is n.+1 then u @` C n else A `\` B.
-pose C := \bigcup_n C_ n; have CA : C `<=` A.
-  by move=> + [] => /[swap]; elim=> [|i IH] y _ []// x /IH/uAB/BA + <-; apply.
-have uC: {homo u : x / x \in C}.
-  by move=> x; rewrite !inE => -[i _ Cix]; exists i.+1 => //; exists x.
-apply/card_set_bijP; exists (fun x => if x \in C then u x else x); split.
-- move=> x Ax; case: ifPn; first by move=> _; apply: uAB.
-  by move/negP; apply: contra_notP => NBx; rewrite inE; exists 0%N.
-- move=> x y xA yA; have := 'inj_u xA yA.
-  have [xC|] := boolP (x \in C); have [yC|] := boolP (y \in C) => // + _.
-    by move=> /[swap]<-; rewrite uC// xC.
-  by move=> /[swap]->; rewrite uC// yC.
-- move=> y /[dup] By /BA Ay/=.
-  case: (boolP (y \in C)); last by exists y; rewrite // ifN.
-  rewrite inE => -[[|i]/= _ []// x Cix <-]; have Cx : C x by exists i.
-  by exists x; [exact: CA|rewrite ifT// inE].
-Qed.
-
-Lemma card_esym T U (A : set T) (B : set U) : A #= B -> B #= A.
-Proof. by move=> /card_eqVP[f]; apply/card_eqP; squash f^-1. Qed.
-
-Lemma card_eq_le T U (A : set T) (B : set U) :
-  (A #= B) = (A #<= B) && (B #<= A).
-Proof.
-apply/idP/andP => [/card_eqVP[f]|[]]; last exact: Cantor_Bernstein.
-by split; apply/card_leP; [squash f|squash f^-1].
-Qed.
-
-Lemma card_eqPle T U (A : set T) (B : set U) :
-  (A #= B) <-> (A #<= B) /\ (B #<= A).
-Proof. by rewrite card_eq_le (rwP andP). Qed.
-
-Lemma card_lexx T (A : set T) : A #<= A.
+Lemma card_lexx T : T #<= T.
 Proof. by apply/card_leP; squash idfun. Qed.
 #[global] Hint Resolve card_lexx : core.
 
-Lemma card_leT T (S : set T) : S #<= [set: T].
-Proof. by apply/card_leP; squash (to_setT \o inclT _ \o val). Qed.
-
-Lemma subset_card_le T (A B : set T) : A `<=` B -> A #<= B.
-Proof. by move=> AB; apply/card_leP; squash (inclT _ \o subfun AB). Qed.
-
-Lemma card_image_le {T U} (f : T -> U) (A : set T) : f @` A #<= A.
-Proof.
-elim/Ppointed: T => T in A f *; first by rewrite !emptyE_subdef image_set0.
-by apply/pcard_leP; squash (pinv A f).
-Qed.
-
-Lemma inj_card_eq {T U} {A} {f : T -> U} : {in A &, injective f} -> f @` A #= A.
-Proof. by move=> /inj_bij/pcard_eq/card_esym. Qed.
-Arguments inj_card_eq {T U A f}.
-
-Lemma card_some {T} {A : set T} : some @` A #= A.
-Proof. exact: inj_card_eq. Qed.
-
-Lemma card_image {T U} {A : set T} (f : {inj A >-> U}) : f @` A #= A.
-Proof. exact: inj_card_eq. Qed.
-
-Lemma card_imsub {T U} (A : set T) (f : {inj A >-> U}) X : X `<=` A -> f @` X #= X.
-Proof. by move=> XA; rewrite (card_image [inj of f \o incl XA]). Qed.
-
-Lemma card_le_trans (T U V : Type) (B : set U) (A : set T) (C : set V) :
-  A #<= B -> B #<= C -> A #<= C.
+Lemma card_le_trans (T U V : Type) :
+  U #<= T -> T #<= V -> U #<= V.
 Proof. by move=> /card_leP[f]/card_leP[g]; apply/card_leP; squash (g \o f). Qed.
 
-Lemma card_eq_sym T U (A : set T) (B : set U) : (A #= B) = (B #= A).
-Proof. by rewrite !card_eq_le andbC. Qed.
+Lemma card_eqxx T : T #= T.
+Proof. by apply/card_eqP; squash idfun. Qed.
+#[global] Hint Resolve card_eqxx : core.
+
+Lemma card_esym T U : T #= U -> U #= T.
+Proof. by move=> /card_eqVP TU; apply/card_eqP. Qed.
+
+Lemma card_eq_sym T U : (T #= U) = (U #= T).
+Proof. by apply/idP/idP => /card_esym. Qed.
 
 Lemma card_eq_trans T U V (A : set T) (B : set U) (C : set V) :
   A #= B -> B #= C -> A #= C.
 Proof. by move=> /card_eqP[f]/card_eqP[g]; apply/card_eqP; squash (g \o f). Qed.
 
-Lemma card_le_eql T T' T'' (A : set T) (B : set T') [C : set T''] :
-   A #= B -> (A #<= C) = (B #<= C).
-Proof. by move=> /card_eqPle[*]; apply/idP/idP; apply: card_le_trans. Qed.
+Lemma card_leT T (S : set T) : S #<= T.
+Proof. by apply/card_leP; squash val. Qed.
 
-Lemma card_le_eqr T T' T'' (A : set T) (B : set T') [C : set T''] :
-   A #= B -> (C #<= A) = (C #<= B).
-Proof. by move=> /card_eqPle[*]; apply/idP/idP => /card_le_trans; apply. Qed.
+Lemma card_setT T : [set: T] #= T.
+Proof. by apply/card_eqVP; squash to_setT. Qed.
+#[global] Hint Resolve card_setT : core.
 
-Lemma card_eql T T' T'' (A : set T) (B : set T') [C : set T''] :
-   A #= B -> (A #= C) = (B #= C).
-Proof. by move=> e; rewrite !card_eq_le (card_le_eql e) (card_le_eqr e). Qed.
+Lemma card_setT_sym T : T #= [set: T].
+Proof. exact/card_esym/card_setT. Qed.
+#[global] Hint Resolve card_setT : core.
 
-Lemma card_eqr T T' T'' (A : set T) (B : set T') [C : set T''] :
-   A #= B -> (C #= A) = (C #= B).
-Proof. by move=> e; rewrite !card_eq_le (card_le_eql e) (card_le_eqr e). Qed.
+Lemma subset_card_le T (A B : set T) : A `<=` B -> A #<= B.
+Proof. by move=> AB; apply/card_leP; squash (incl AB). Qed.
+
+(* TODO: move to classical_sets.v *)
+Lemma set00 T : @set0 T -> False.
+Proof. by case=> x; rewrite in_set0. Qed.
+
+(* TOTHINK: The subject head is `memType` so I can only declare empty and not
+  any other structure (i.e. finType) *)
+HB.instance Definition _ T := Type_isEmpty.Build (@set0 T) (@set00 T).
+
+Lemma card_ge0 (T : emptyType) U : T #<= U.
+Proof.
+apply/card_leP/squash.
+have f: T -> U by move=> /no.
+by have /Pinj[]: injective f by move=> /[dup]/no.
+Qed.
+#[global] Hint Resolve card_ge0 : core.
+
+Lemma card_le0P T (U : emptyType) : reflect ([set: T] = set0) (T #<= U).
+Proof.
+apply: (iffP idP) => [/card_leP[f]|T0].
+  by apply/eqP/seteqP => /[dup] /f/no.
+apply/card_leP/squash.
+have f: T -> U by move=> x; have: x \in setT by []; rewrite T0 in_set0.
+suff /Pinj[]: injective f by [].
+by move=> x; have: x \in setT by []; rewrite T0 in_set0.
+Qed.
+
+Lemma card_le0 T (U : emptyType) : (T #<= U) = ([set: T] == set0).
+Proof.
+by apply/card_le0P/eqP => T0; apply/eqP/seteqP => x; rewrite in_set0;
+  apply/negP => _; have: x \in [set: T] by []; rewrite T0.
+Qed.
+
+Lemma card_le_eql {T U V} :
+   T #= U -> (T #<= V) = (U #<= V).
+Proof.
+move=> /card_eqP[f]; apply/card_leP/card_leP => -[] g; apply: squash.
+  exact: (g \o f^-1).
+exact: (g \o f).
+Qed.
+
+Lemma card_le_eqr {T U V} :
+   T #= U -> (V #<= T) = (V #<= U).
+Proof.
+move=> /card_eqP[f]; apply/card_leP/card_leP => -[] g; apply: squash.
+  exact: (f \o g).
+exact: (f^-1 \o g).
+Qed.
+
+Lemma card_eql {T U V} :
+   T #= U -> (T #= V) = (U #= V).
+Proof.
+move=> /card_eqP[f]; apply/card_eqP/card_eqP => -[] g; apply: squash.
+  exact: (g \o f^-1).
+exact: (g \o f).
+Qed.
+
+Lemma card_eqr {T U V} :
+   T #= U -> (V #= T) = (V #= U).
+Proof.
+move=> /card_eqP[f]; apply/card_eqP/card_eqP => -[] g; apply: squash.
+  exact: (f \o g).
+exact: (f^-1 \o g).
+Qed.
+
+Section empty1.
+Implicit Types (T : emptyType).
+Lemma empty_eq0 T : all_equal_to (set0 : set T).
+Proof. by move=> X; apply/setF_eq0/no. Qed.
+Lemma card_le_emptyl T U : T #<= U.
+Proof. exact: card_ge0. Qed.
+Lemma card_le_emptyr T U : (U #<= T) = ([set: U] == set0).
+Proof.
+by apply/idP/eqP => [/card_le0P//|]; rewrite -(card_le_eql (card_setT U)) => ->.
+Qed.
+
+Definition emptyE_subdef := (empty_eq0, card_le_emptyl, card_le_emptyr, eq_opE).
+End empty1.
+
+(*
+Lemma setC_some (T : eqType) : ~` (range some) = [set None] :> set (option T).
+Proof.
+apply/eqP/seteqP; case=> [x|].
+  by rewrite in_setC range_f/= in_set1; apply/esym/eqP.
+by rewrite in_set1 eqxx in_setC; apply/negP => /rangeP[].
+Qed.
+
+Lemma card_le_option T U : (option T #<= option U) = (T #<= U).
+Proof.
+apply/card_leP/card_leP => -[f]; last by squash (omap f).
+apply: squash.
+wlog: f / range (f \o some) `<=` range some => fsome.
+  case/boolP: (range (f \o some) `<=` range some) => [/fsome//|].
+  move: f fsome; rewrite -/(_ {classic T}) -/(_ {classic U}) => f fsome.
+  move=> /negP/nonsubset/cid[] _ /andP[] /rangeP/cid[] x <-.
+  rewrite setC_some in_set1.
+  move=> /eqP/= x0.
+  apply: (fsome (f \o (@swap (option (classicType T)) None (Some x)))).
+  apply/subsetP => _ /rangeP[] y <-/=.
+  rewrite -[_ \in _]negbK -in_setC setC_some in_set1 -x0 /swap/=.
+  by apply/eqP => /(@inj _ _ f); case: ifPn => /eqP.
+admit.
+Admitted.
+ *)
+
+Lemma card_eq_range T U (f : {inj T >-> U}) : range f #= T.
+Proof.
+apply/card_esym/card_eqP/squash.
+move gE: (sigR f (subset_refl _)) => g.
+suff /PbijTT[] : bijective g by [].
+rewrite -gE; split; first exact: inj.
+apply/subsetP; case=> _ /[dup]/rangeP[] x <- fx _.
+by apply/rangeP; exists x; apply: val_inj.
+Qed.
+
+Theorem Cantor_Bernstein T U :
+  T #<= U -> U #<= T -> T #= U.
+Proof.
+suff card_eq (A : set T) : T #<= A -> T #= A.
+  move=> ? /card_leP[g]; move: (card_eq (range g)).
+  by rewrite (card_eqr (card_eq_range g)) (card_le_eqr (card_eq_range g)).
+move=> /card_leP[u].
+pose C_ := fix C n := if n is n.+1 then (val \o u) @` C n else ~` A.
+pose C := \bigcup_n C_ n.
+have /subsetP CA : ~` C `<=` A.
+  by rewrite setC_bigcup; apply/subsetP => x /in_bigcapP/(_ 0); rewrite setCK.
+have uC: {homo (val \o u) : x / x \in C}.
+  by move=> x/= => /in_bigcupP[] i Cix; apply/in_bigcupP; exists i.+1 => /=.
+pose f x := if x \in C then val (u x) else x.
+have fA x : f x \in A by rewrite /f; case: ifPn => // /CA.
+suff /PbijTT[s _]: bijective (f : T -> A) by apply/card_eqP/squash.
+split.
+  move=> x y; rewrite /f => /(congr1 val)/=.
+  have [xC|] := boolP (x \in C); have [yC|] := boolP (y \in C) => //.
+  - exact: (@inj _ _ (val \o u)).
+  - by move=> /[swap]/= <- /negP; have := uC _ xC.
+  - by move=> /[swap]/= -> /negP; have := uC _ yC.
+apply/subsetP => y _.
+case: (boolP (val y \in C)) => [|/negPf yC]; last first.
+  by apply/rangeP; exists y; apply: val_inj; rewrite /f/= yC.
+move=> /in_bigcupP[] [/negP/(_ _)//|i]/= /imageP[] x [] xC xy.
+apply/rangeP; exists x; apply: val_inj; rewrite /f/=.
+by have -> : x \in C by apply/in_bigcupP; exists i.
+Qed.
+
+Lemma card_eq_le T U : (T #= U) = (T #<= U) && (U #<= T).
+Proof.
+apply/idP/andP => [/card_eqVP[f]|[]]; last exact: Cantor_Bernstein.
+by split; apply/card_leP; [squash f^-1|squash f].
+Qed.
+
+Lemma card_eqPle T U : (T #= U) <-> (T #<= U) /\ (U #<= T).
+Proof. by rewrite card_eq_le (rwP andP). Qed.
+
+Lemma card_bijP {T U} :
+   reflect (exists f : T -> U, bijective f) (T #= U).
+Proof.
+apply: (iffP card_eqP) => [[f]|[_ /PbijTT[f _]]]; [exists f|squash f].
+exact: bij.
+Qed.
+
+Lemma card_set_bijP {T U} :
+   reflect (exists f, @splitbijective U T f) (T #= U).
+Proof.
+apply: (iffP card_eqP) => [[f]|[_ /split_bijectiveP/PbijTT[f _]]]; [exists f|squash f].
+exact/split_bijectiveP/bij.
+Qed.
+
+Lemma card_eq00 T U : @set0 T #= @set0 U.
+Proof. by apply: Cantor_Bernstein; apply: card_ge0. Qed.
+#[global] Hint Resolve card_eq00 : core.
+
+Lemma card_range_le {T U} (f : T -> U) : range f #<= T.
+Proof.
+apply/card_leP/squash.
+have fsurj : surjective (f : T -> range f).
+  apply/subsetP; case=> _ /[dup] /rangeP[] x <- fx _.
+  by apply/rangeP; exists x; apply: val_inj.
+exact: (fsurj^-1).
+Qed.
+
+Lemma card_image_le {T U} (f : T -> U) (A : set T) : f @` A #<= A.
+Proof. exact: card_range_le. Qed.
+
+Lemma inj_card_eq {T U} {f : T -> U} : injective f -> range f #= T.
+Proof. by move=> /Pinj[] s ->; apply: card_eq_range. Qed.
+Arguments inj_card_eq {T U f}.
+
+Lemma card_some {T} : range (some : T -> _) #= T.
+Proof. exact/inj_card_eq/Some_inj. Qed.
+
+Lemma card_image {T U} {A : set T} (f : {inj T >-> U}) : f @` A #= A.
+Proof. exact: (@card_eq_range _ _(f \o val)). Qed.
+
+(*
+Lemma card_imsub {T U} (A : set T) (f : {inj A >-> U}) X : X `<=` A -> f @` X #= X.
+Proof. by move=> XA; rewrite (card_image [inj of f \o incl XA]). Qed.
 
 Lemma card_ge_image {T U V} {A : set T} (f : {inj A >-> U}) X (Y : set V) :
   X `<=` A -> (f @` X #<= Y) = (X #<= Y).
@@ -312,14 +396,13 @@ Lemma card_eq_image2 {T U} (A : set T) (f : {inj A >-> U}) X Y :
    X `<=` A -> Y `<=` A ->
    (f @` X #= f @` Y) = (X #= Y).
 Proof. by move=> *; rewrite card_eq_image// card_eq_imager. Qed.
-
-Lemma card_ge_some {T T'} {A : set T} {B : set T'} :
-  (some @` A #<= B) = (A #<= B).
+ *)
+Lemma card_ge_some {T U} : (range (some : T -> _) #<= U) = (T #<= U).
 Proof. by rewrite (card_le_eql card_some). Qed.
 
-Lemma card_le_some {T T'} {A : set T} {B : set T'} :
-  (A #<= some @` B) = (A #<= B).
+Lemma card_le_some {T U} : (T #<= (range (some : U -> _))) = (T #<= U).
 Proof. by rewrite (card_le_eqr card_some). Qed.
+(*
 
 Lemma card_le_some2 {T T'} {A : set T} {B : set T'} :
   (some @` A #<= some @` B) = (A #<= B).
@@ -336,89 +419,88 @@ Proof. by rewrite (card_eqr card_some). Qed.
 Lemma card_eq_some2 {T T'} {A : set T} {B : set T'} :
   (some @` A #= some @` B) = (A #= B).
 Proof. by rewrite card_eq_somel card_eq_somer. Qed.
+ *)
 
-Lemma card_eq0 {T U} {A : set T} : (A #= @set0 U) = (A == set0).
+Lemma card_eq0 {T U} : (T #= @set0 U) = ([set: T] == set0).
 Proof. by rewrite card_eq_le card_le0 card_ge0 andbT. Qed.
 
-Lemma card_set1 {T} {x : T} : [set x] #= `I_1.
+Lemma card_set1 {T : eqType} {x : T} : [set x] #= `I_1.
 Proof.
-apply/pcard_eqP; suff /Pbij[f]: set_bij [set x] `I_1 (fun=> 0%N) by squash f.
-by split=> [//|y z /[!in_setE]-> ->//|[]//]; exists x.
+apply/card_eqP; suff /Pbij[f]: @bijective [set x] `I_1 (fun=> 0%N) by squash f.
+split=> [[] _ /[dup]/eqP-> xx [] z /[dup]/eqP-> xx' _|]; first exact: val_inj.
+apply/subsetP => y _; apply/rangeP; exists x; apply: val_inj => /=.
+by case: y => y/=; rewrite [_ \in _]leqn0 => /eqP/esym.
 Qed.
 
-Lemma eq_card1 {T U} (x : T) (y : U) : [set x] #= [set y].
+Lemma eq_card1 {T U : eqType} (x : T) (y : U) : [set x] #= [set y].
 Proof. by rewrite (card_eql card_set1) (card_eqr card_set1). Qed.
 
-Lemma card_eq_emptyr (T : emptyType) U (A : set T) (B : set U) :
-  (B #= A) = (B == set0).
-Proof. by rewrite empty_eq0; exact: card_eq0. Qed.
+Lemma card_eq_emptyr (T : emptyType) U :
+  (U #= T) = ([set: U] == set0).
+Proof. by rewrite -(card_eqr (card_setT T)) empty_eq0; exact: card_eq0. Qed.
 
-Lemma card_eq_emptyl (T : emptyType) U (A : set T) (B : set U) :
-  (A #= B) = (B == set0).
+Lemma card_eq_emptyl (T : emptyType) U :
+  (T #= U) = ([set: U] == set0).
 Proof. by rewrite card_eq_sym card_eq_emptyr. Qed.
 
 Definition emptyE := (emptyE_subdef, card_eq_emptyr, card_eq_emptyl).
 
-Lemma card_setT T (A : set T) : [set: A] #= A.
-Proof. by apply/card_esym/card_eqP; squash to_setT. Qed.
-#[global] Hint Resolve card_setT : core.
-
-Lemma card_setT_sym T (A : set T) : A #= [set: A].
-Proof. exact/card_esym/card_setT. Qed.
-#[global] Hint Resolve card_setT : core.
-
-Lemma surj_card_ge {T U} {A : set T} {B : set U} : {surj B >-> A} -> A #<= B.
+Lemma surj_card_ge {T U} : {surj U >-> T} -> T #<= U.
 Proof.
-by move=> g; rewrite (card_le_trans (subset_card_le 'surj_g)) ?card_image_le.
+move=> g.
+apply: (card_le_trans _ (card_range_le g)).
+have := @surj _ _ g; rewrite [surjective _]subTset => /eqP ->.
+by rewrite (card_le_eqr (card_setT T)).
 Qed.
-Arguments surj_card_ge {T U A B} g.
+Arguments surj_card_ge {T U} g.
 
-Lemma pcard_surjP {T : pointedType} {U} {A : set T} {B : set U} :
-  reflect (exists g, set_surj B A g) (A #<= B).
+Lemma pcard_surjP {T : pointedType} {U} :
+  reflect (exists g : U -> T, surjective g) (T #<= U).
 Proof.
-apply: (iffP idP) => [|[_ /Psurj[g _]]]; last exact: surj_card_ge.
-elim/Ppointed: U => U in B *; first by rewrite ?emptyE => ->; exists any.
-by move=> /pcard_leP[f]; exists (pinv A f); apply: subl_surj surj.
+apply: (iffP idP) => [|[_ /Psurj[g _]]]; last exact/surj_card_ge/g.
+by move=> /pcard_leP[f]; exists (f^-1); exact: surj.
 Qed.
 
-Lemma pcard_geP {T : pointedType} {U} {A : set T} {B : set U} :
-  reflect $|{surj B >-> A}| (A #<= B).
-Proof. by apply: (iffP pcard_surjP); rewrite surjPex. Qed.
-
-Lemma ocard_geP {T U} {A : set T} {B : set U} :
-  reflect $|{surj B >-> some @` A}| (A #<= B).
-Proof.
-by elim/Pchoice: T => T in A *; rewrite -card_ge_some; apply: pcard_geP.
+Lemma pcard_geP {T : pointedType} {U} :
+  reflect $|{surj U >-> T}| (T #<= U).
+Proof. apply: (iffP pcard_surjP).
+(* TODO: Why do `rewrite surjPex` and `apply/surjPex` fail? *)
+exact: surjPex.2.
+exact: surjPex.1.
 Qed.
 
-Lemma pfcard_geP {T U} {A : set T} {B : set U} :
-  reflect (A = set0 \/ $|{surjfun B >-> A}|) (A #<= B).
+(* TOTHINK: What is the point of this if I still need a pointedType structure
+  on T?
+Lemma ocard_geP {T U} :
+  reflect $|{surj U >-> range (some : T -> _)}| (T #<= U).
 Proof.
-apply: (iffP idP); last by move=> [->//|[f]]; apply: surj_card_ge; exact: f.
-elim/Ppointed: T => T in A *; first by rewrite !emptyE; left.
-elim/Ppointed: U => U in B *; first by rewrite !emptyE => ->; right; squash any.
-move=> /pcard_geP[f]; case: (eqVneq A set0); first by left.
-move=> /set0P[x Ax]; right; apply/surjfunPex.
-exists (fun y => if f y \in A then f y else x).
-apply/seteqP; split.
-  by move=> x' /[dup] /= /'surj_f [y By <-] Afy; exists y; rewrite ?ifT// inE.
-by apply/image_subP => y By; case: ifPn; rewrite (inE, notin_setE).
+elim/Ppointed: T => T; rewrite -card_ge_some; last first.
+apply: pcard_geP.
+Qed.
+ *)
+
+Lemma pfcard_geP {T U} :
+  reflect ([set: T] = set0 \/ $|{surj U >-> T}|) (T #<= U).
+Proof.
+apply: (iffP idP); last first.
+  move=> [T0|[f]]; last by apply: surj_card_ge; exact: f.
+  by rewrite -(card_le_eql (card_setT T)) T0 card_ge0.
+elim/Ppointed: T => T; first by rewrite !emptyE; left.
+by move=> /pcard_geP; right.
 Qed.
 
 Lemma card_le_II n m : (`I_n #<= `I_m) = (n <= m)%N.
 Proof.
-apply/idP/idP=> [/card_leP[f]|?];
-  last by apply/subset_card_le => k /leq_trans; apply.
-by have /leq_card := in2TT 'inj_(IIord \o f \o IIord^-1); rewrite !card_ord.
+apply/idP/idP=> [/card_leP[f]|?]; last first.
+  by apply/subset_card_le/subsetP => k /leq_trans; apply.
+by have /leq_card := @inj _ _ (IIord \o f \o IIord^-1); rewrite !card_ord.
 Qed.
 
-Lemma ocard_eqP {T U} {A : set T} {B : set U} :
-  reflect $|{bij A >-> some @` B}| (A #= B).
-Proof.
-elim/Pchoice: U => U in B *.
-by rewrite -(card_eqr card_some); exact: (iffP pcard_eqP).
-Qed.
+Lemma ocard_eqP {T U} :
+  reflect $|{splitbij T >-> range (some : U -> _)}| (T #= U).
+Proof. by rewrite -(card_eqr card_some); exact: card_eqP. Qed.
 
+(*
 Lemma oocard_eqP {T U} {A : set T} {B : set U} :
   reflect $|{splitbij some @` A >-> some @` B}| (A #= B).
 Proof.
@@ -426,319 +508,393 @@ elim/Pchoice: U => U in B *; elim/Pchoice: T => T in A *.
 rewrite -(card_eql card_some) -(card_eqr card_some).
 exact: (iffP ppcard_eqP).
 Qed.
+ *)
 
 Lemma card_eq_II {n m} : reflect (n = m) (`I_n #= `I_m).
 Proof. by rewrite card_eq_le !card_le_II -eqn_leq; apply: eqP. Qed.
 
-Lemma sub_setP  {T} {A : set T} (X : set A) : set_val @` X `<=` A.
-Proof. by move=> x [/= a Xa <-]; apply: set_valP. Qed.
+Lemma sub_setP  {T} {A : set T} (X : set A) : val @` X `<=` A.
+Proof. by apply/subsetP => x /imageP[] /= a [] Xa <-. Qed.
 Arguments sub_setP {T A}.
 Arguments image_subset {aT rT} f [A B].
 
-Lemma card_subP T U (A : set T) (B : set U) :
-  reflect (exists2 C, C #= A & C `<=` B) (A #<= B).
+Lemma card_subP T U :
+  reflect (exists (A : set U), A #= T) (T #<= U).
 Proof.
-apply: (iffP idP) => [/card_leP[f]|[C CA CB]]; last first.
-  by rewrite -(card_le_eql CA); apply/card_leP; squash (inclT _ \o subfun CB).
-exists (set_val @` range f); last exact: (subset_trans (sub_setP _)).
-by rewrite ?(card_eql (inj_card_eq _))//; apply: in2W; apply: in2TT; apply: inj.
+apply: (iffP idP) => [/card_leP[f]|[A AT]]; last first.
+  by rewrite -(card_le_eql AT) card_leT.
+by exists (range f); rewrite (card_eql (inj_card_eq _)).
 Qed.
 
 (* remove *)
-Lemma pigeonhole m n (f : nat -> nat) : {in `I_m &, injective f} ->
-  f @` `I_m `<=` `I_n -> (m <= n)%N.
+Lemma pigeonhole m n (f : `I_m -> nat) : injective f ->
+  range f `<=` `I_n -> (m <= n)%N.
 Proof.
 move=> /Pinj[{}f->] /subset_card_le.
 by rewrite (card_le_eql (inj_card_eq _))// card_le_II.
 Qed.
 
-Definition countable T (A : set T) := A #<= @setT nat.
+Definition countable T := T #<= nat.
 
-Lemma eq_countable T U (A : set T) (B : set U) :
-  A #= B -> countable A = countable B.
-Proof. by move=> /card_le_eql leA; rewrite /countable leA. Qed.
+Lemma eq_countable T U :
+  T #= U -> countable T = countable U.
+Proof. by move=> /card_le_eql leT; rewrite /countable leT. Qed.
 
-Lemma countableP (T : countType) (A : set T) : countable A.
-Proof. by apply/card_leP; squash (to_setT \o choice.pickle). Qed.
+Lemma countableP (T : countType) : countable T.
+Proof. by apply/card_leP; squash choice.pickle. Qed.
 #[global] Hint Resolve countableP : core.
 
 Lemma countable0 T : countable (@set0 T). Proof. exact: card_ge0. Qed.
 #[global] Hint Resolve countable0 : core.
 
-Lemma countable_injP T (A : set T) :
-  reflect (exists f : T -> nat, {in A &, injective f}) (countable A).
-Proof. exact: pcard_injP. Qed.
+Lemma countable_injP T :
+  reflect (exists f : T -> nat, injective f) (countable T).
+Proof. exact: card_injP. Qed.
 
-Lemma countable_bijP T (A : set T) :
-  reflect (exists B : set nat, (A #= B)%card) (countable A).
+Lemma countable_bijP T :
+  reflect (exists B : set nat, (T #= B)%card) (countable T).
 Proof.
 apply: (iffP idP); last by move=> [B] /eq_countable ->.
-move=> /pcard_leP[f]; exists (f @` A).
-by apply/pcard_eqP; squash [fun f in A].
+move=> /card_leP[f]; exists (range f).
+by rewrite (card_eqr (card_eq_range f)).
 Qed.
 
-Lemma sub_countable T U (A : set T) (B : set U) : A #<= B ->
-  countable B -> countable A.
+Lemma sub_countable T U : T #<= U ->
+  countable U -> countable T.
 Proof. exact: card_le_trans. Qed.
 
-Lemma finite_setP T (A : set T) : finite_set A <-> exists n, A #= `I_n.
+Lemma finiteP T : finite T <-> exists n, T #= `I_n.
 Proof. by []. Qed.
 
-Lemma finite_II n : finite_set `I_n. Proof. by apply/finite_setP; exists n. Qed.
+Lemma eq_finite T U :
+  T #= U -> finite T = finite U.
+Proof.
+move=> eqTU; apply/propeqP.
+by split=> -[n Xn]; exists n; move: Xn; rewrite (card_eql eqTU).
+Qed.
+
+Lemma finite_II n : finite `I_n. Proof. by apply/finiteP; exists n. Qed.
 #[global] Hint Resolve finite_II : core.
 
-Lemma card_II {n} : `I_n #= [set: 'I_n].
-Proof. by apply/card_esym/pcard_eqP/bijPex; exists val; split. Qed.
+Lemma card_II {n} : `I_n #= 'I_n.
+Proof. by apply/card_esym/card_eqP; squash IIord^-1. Qed.
 
-Lemma finite_fsetP {T : choiceType} {A : set T} :
-  finite_set A <-> exists X : {fset T}, A = [set` X].
+Lemma finite_subfset {T : choiceType} (X : {fset T}) : finite [set` X].
 Proof.
-rewrite finite_setP; split=> [[n]|[X {A}->]]; last first.
-  exists #|{: X}|; rewrite (card_eqr card_II).
-  by apply/card_eqP; squash (to_setT \o enum_rank \o val_finset).
-rewrite (card_eqr card_II) => /card_esym/card_eqVP[f]; pose g := f \o to_setT.
-exists [fset val (g i) | i in 'I_n]%fset.
-apply/seteqP; split=> [x /mem_set Ax|_ /imfsetP[i _ ->]]; last exact: set_valP.
-by apply/imfsetP; exists (g^-1 (SigSub Ax)); rewrite ?[g _]invK//= inE.
+exists #|{: X}|; rewrite (card_eqr card_II).
+by apply/card_eqP; squash (enum_rank \o val_finset).
+Qed.
+Arguments finite_subfset {T} X.
+
+Lemma finite_subfsetP {T} {U : choiceType} (f : {inj T >-> U}) :
+  finite T <-> exists X : {fset U}, range f = [set` X].
+Proof.
+(* TOTHINK: Why does setoid rewrite fail? *)
+split=> [/finiteP [n]|[X] TE]; last first.
+  by rewrite -(eq_finite (card_eq_range f)) TE; apply: finite_subfset.
+rewrite (card_eqr card_II) => /card_esym/card_eqVP[g].
+exists [fset f (g^-1 i) | i in 'I_n]%fset.
+apply/eqP/seteqP => y; apply/rangeP/imfsetP => /= [[x <-]|[x _ ->]].
+  by exists (g x); rewrite // invK.
+by exists (g^-1 x).
 Qed.
 
-Lemma finite_subfset {T : choiceType} (X : {fset T}) {A : set T} :
-  A `<=` [set` X] -> finite_set A.
+Lemma finite_fsetP {T : choiceType} :
+  finite T <-> exists X : {fset T}, [set: T] = [set` X].
 Proof.
-move=> AX; apply/finite_fsetP; exists [fset x in X | x \in A]%fset.
-apply/seteqP; split=> x; rewrite /= ?inE; last by move=> /andP[_ /set_mem].
-by move=> Ax; rewrite mem_set ?andbT//; apply: AX.
-Qed.
-Arguments finite_subfset {T} X {A}.
-
-Lemma finite_set0 T : finite_set (set0 : set T).
-Proof. by apply/finite_setP; exists 0%N; rewrite II0. Qed.
-#[global] Hint Resolve finite_set0 : core.
-
-Lemma finite_seqP {T : eqType} A :
-   finite_set A <-> exists s : seq T, A = [set` s].
-Proof.
-elim/eqPchoice: T => T in A *; rewrite finite_fsetP.
-split=> [[X ->]|[s ->]]; first by exists X.
-by exists [fset x | x in s]%fset; apply/seteqP; split=> x /=; rewrite inE.
+suff ->: [set: T] = range id by apply: (finite_subfsetP idfun).
+by apply/eqP/seteqP => x; rewrite in_setT; apply/esym.
 Qed.
 
-Lemma finite_seq {T : eqType} (s : seq T) : finite_set [set` s].
-Proof. by apply/finite_seqP; exists s. Qed.
+Lemma finite0 T : finite (set0 : set T).
+Proof. by apply/finiteP; exists 0%N; rewrite II0. Qed.
+#[global] Hint Resolve finite0 : core.
+
+Lemma finite_seq {T : eqType} (s : seq T) : finite [set` s].
+Proof.
+elim/eqPchoice: T => T in s *.
+apply/(finite_subfsetP val).
+exists [fset x | x in s]%fset.
+apply/eqP/seteqP => x.
+apply/rangeP/imfsetP => [[]y <-|[]y + ->].
+  by exists (val y); first exact: valP.
+by rewrite -[in_mem _ _]/(y \in [set` s])/= => ys; exists y.
+Qed.
 #[global] Hint Resolve finite_seq : core.
 
-Lemma finite_fset {T : choiceType} (X : {fset T}) : finite_set [set` X].
-Proof. by apply/finite_fsetP; exists X. Qed.
+Lemma finite_subseqP {T} {U : choiceType} (f : {inj T >-> U}) :
+  finite T <-> exists s : seq U, range f = [set` s].
+Proof.
+split=> [/finiteP [n]|[s] TE]; last first.
+  by rewrite -(eq_finite (card_eq_range f)) TE; apply: finite_seq.
+rewrite (card_eqr card_II) => /card_esym/card_eqVP[g].
+exists [fset f (g^-1 i) | i in 'I_n]%fset.
+apply/eqP/seteqP => y; apply/rangeP/imfsetP => /= [[x <-]|[x _ ->]].
+  by exists (g x); rewrite // invK.
+by exists (g^-1 x).
+Qed.
+
+Lemma finite_seqP {T : eqType} :
+   finite T <-> exists s : seq T, [set: T] = [set` s].
+Proof.
+elim/eqPchoice: T => T.
+suff ->: [set: T] = range id by apply: (finite_subseqP idfun).
+by apply/eqP/seteqP => x; rewrite in_setT; apply/esym.
+Qed.
+
+(* TODO: move to classical_sets.v *)
+Lemma range_val {T} (X : set T) : range (val : X -> T) = X.
+Proof.
+by apply/eqP/seteqP => y; apply/rangeP/idP => [[]x <-//|yX]; exists y.
+Qed.
+
+Lemma finite_fset {T : choiceType} (X : {fset T}) : finite X.
+Proof.
+apply/(finite_subfsetP val); exists X.
+apply/eqP/seteqP => y; apply/rangeP/idP => [[]x <-|yX]; first exact: valP.
+by exists [` yX]%fset.
+Qed.
 #[global] Hint Resolve finite_fset : core.
 
 Lemma finite_finpred {T : finType} {pT : predType T} (P : pT) :
-  finite_set [set` P].
+  finite [set` P].
 Proof.
-rewrite finite_seqP; exists (enum P).
-by apply/seteqP; split=> x/=; rewrite mem_enum.
+rewrite (finite_subseqP val); exists (enum P).
+by apply/eqP/seteqP => x/=; rewrite range_val mem_enum.
 Qed.
 #[global]
-Hint Extern 0 (finite_set [set` _]) => solve [apply: finite_finpred] : core.
+Hint Extern 0 (finite [set` _]) => solve [apply: finite_finpred] : core.
 
-Lemma finite_finset {T : finType} {X : set T} : finite_set X.
+Lemma finite_finset {T : finType} {X : set T} : finite X.
 Proof.
-by have -> : X = [set` mem X] by apply/seteqP; split=> x /=; rewrite ?inE.
+have -> : X = [set` mem X] by apply/eqP/seteqP => x /=; rewrite !inE.
+(* TOTHINK: Why is this not applied by the `Hint Extern` above? *)
+exact: finite_finpred.
 Qed.
 #[global] Hint Resolve finite_finset : core.
 
-Lemma finite_set_countable T (A : set T) : finite_set A -> countable A.
-Proof. by move=> /finite_setP[n /eq_countable->]. Qed.
+Lemma finite_countable T : finite T -> countable T.
+Proof. by move=> /finiteP[n /eq_countable->]. Qed.
 
-Lemma infiniteP T (A : set T) : infinite_set A <-> [set: nat] #<= A.
+(* TODO: move to classical_sets.v *)
+Lemma range_id (T : Type) : range (id : T -> T) = setT.
+Proof. by rewrite -image_setT image_id. Qed.
+
+Lemma infiniteP T : infinite T <-> nat #<= T.
 Proof.
-elim/Ppointed: T => T in A *.
-  by rewrite !emptyE; split=> // /(congr1 (@^~ 0%N))/=; rewrite propeqE => -[].
-split=> [Ainfinite| + /finite_setP[n eqAI]]; last first.
+elim/Pchoice: T => T.
+split=> [Ainfinite| + /finiteP[n eqAI]]; last first.
   rewrite (card_le_eqr eqAI) => le_nat_n.
   suff: `I_n.+1 #<= `I_n by rewrite card_le_II ltnn.
-  exact: card_le_trans (subset_card_le _) le_nat_n.
-have /all_sig2[f Af fX] : forall X : {fset T}, {x | x \in A & x \notin X}.
-  move=> X; apply/sig2W; apply: contra_notP Ainfinite => nAX; apply/finite_fsetP.
-  exists [fset x in X | x \in A]%fset; rewrite eqEsubset; split; last first.
-    by move=> x/=; rewrite !inE => /andP[_]; rewrite inE.
-  move=> x Ax /=; rewrite !inE/=; apply/andP; split; rewrite ?inE//.
+  exact/(card_le_trans _ le_nat_n)/card_leT.
+have /all_sig[f fX] : forall X : {fset T}, {x | x \notin X}.
+  move=> X; apply/sigW; apply: contra_notP Ainfinite => nAX.
+  apply/finite_fsetP; exists X; apply/esym/eqP/seteqP => x; rewrite in_setT.
   by apply: contra_notT nAX => xNX; exists x; rewrite ?inE.
-do [under [forall x : {fset _}, _]eq_forall do rewrite inE] in Af *.
 suff [g gE] : exists g : nat -> T,
     forall n, g n = f [fset g k | k in iota 0 n]%fset.
-  have /Pinj[h hE] : {in setT &, injective g}.
-    move=> i j _ _; apply: contra_eq; wlog lt_ij : i j / (i < j)%N => [hwlog|_].
+  apply/card_injP; exists g.
+  move=> i j; apply: contra_eq; wlog lt_ij : i j / (i < j)%N => [hwlog|_].
     by case: ltngtP => // ij _; [|rewrite eq_sym];
-       apply: hwlog=> //; rewrite lt_eqF//.
-    rewrite [g j]gE; set X := (X in f X); have := fX X.
-    by apply: contraNneq => <-; apply/imfsetP; exists i => //=; rewrite mem_iota.
-  have/injPfun[i _] : {homo h : x / setT x >-> A x} by move=> i; rewrite -hE gE.
-  by apply/pcard_leP; squash i.
-pose g := fix g n k := if n isn't n'.+1 then f fset0
-                       else f [fset g n' i | i in iota 0 k]%fset.
-exists (fun n => g n n) => n.
-suff {n} gn n k : (k <= n)%N -> g n k = f [fset g k k | k in iota 0 k]%fset.
-  by rewrite gn//; congr f; apply/fsetP => k.
-have [m] := ubnP n; elim: m n k => //= m IHm [|n] k /=.
-  rewrite leqn0 => _ /eqP->/=.
-  congr f; apply/fsetP => x; rewrite !inE; symmetry.
-  by apply/imfsetP => /= -[].
-rewrite ltnS => ltmn lekSn /=; congr f; apply/fsetP => i.
-by apply/imfsetP/imfsetP => /= -[j]; rewrite mem_iota/= => jk ->;
-   exists j; rewrite ?mem_iota//= ?add0n ?IHm//;
-   by [rewrite (leq_trans jk)// (leq_trans lekSn)|rewrite -ltnS (leq_trans jk)].
+      apply: hwlog => //; rewrite (@lt_eqF _ _ _ _ _)//.
+  rewrite [g j]gE; set X := (X in f X); have := fX X.
+  by apply: contraNneq => <-; apply/imfsetP; exists i => //=; rewrite mem_iota.
+pose g := fix g n :=
+  if n isn't n'.+1 then fset0 else let X := g n' in (f X |` X)%fset.
+exists (f \o g) => /= n; congr f.
+elim: n => /= [|n IHn].
+  by apply/esym/fsetP => x; rewrite inE; apply/negP => /imfsetP[].
+rewrite [X in (_ |` X)%fset]IHn.
+apply/fsetP => y; apply/fset1UP/imfsetP => /= [[->|/imfsetP[k] + ->]|[]k + ->].
+- by exists n; rewrite // (mem_iota 0 n.+1)/= leqnn.
+- rewrite mem_iota => kn; exists k; rewrite // (mem_iota 0 n.+1) ltnS/=.
+  exact: ltnW.
+rewrite (mem_iota 0 n.+1)/= ltnS leq_eqVlt => /orP[/eqP ->|kn]; first by left.
+by right; apply/imfsetP; exists k => //; rewrite mem_iota.
 Qed.
 
-Lemma finite_setPn T (A : set T) : finite_set A <-> ~ ([set: nat] #<= A).
+Lemma finitePn T : finite T <-> ~ (nat #<= T).
 Proof. by rewrite -infiniteP notK. Qed.
 
-Lemma card_le_finite T U (A : set T) (B : set U) :
-  A #<= B -> finite_set B -> finite_set A.
+Lemma card_le_finite T U :
+  T #<= U -> finite U -> finite T.
 Proof.
-by move=> ?; rewrite !finite_setPn; apply: contra_not => /card_le_trans; apply.
+move=> ? /finitePn Ufin; apply/finitePn.
+by apply: contra_not Ufin => /card_le_trans; apply.
 Qed.
 
-Lemma sub_finite_set T (A B : set T) : A `<=` B ->
-  finite_set B -> finite_set A.
+Lemma sub_finite T (A B : set T) : A `<=` B ->
+  finite B -> finite A.
 Proof. by move=> ?; apply/card_le_finite/subset_card_le. Qed.
 
-Lemma finite_set_leP T (A : set T) : finite_set A <-> exists n, A #<= `I_n.
+Lemma finite_leP T : finite T <-> exists n, T #<= `I_n.
 Proof.
-split=> [[n /card_eqPle[]]|[n leAn]]; first by exists n.
-by apply: card_le_finite leAn _; exists n.
+split=> [[n /card_eqPle[]]|[n leTn]]; first by exists n.
+by apply: card_le_finite leTn _; exists n.
 Qed.
 
 Lemma card_ge_preimage {T U} (B : set U) (f : T -> U) :
-  {in f @^-1` B &, injective f} -> f @^-1` B #<= B.
+  injective f -> f @^-1` B #<= B.
 Proof.
 move=> /Pinj[g eqg]; rewrite -(card_le_eql (card_image g)) -eqg.
 by apply: subset_card_le; apply: image_preimage_subset.
 Qed.
 
 Corollary finite_preimage {T U} (B : set U) (f : T -> U) :
-  {in f @^-1` B &, injective f} -> finite_set B -> finite_set (f @^-1` B).
+  injective f -> finite B -> finite (f @^-1` B).
 Proof. by move=> /card_ge_preimage fB; apply: card_le_finite. Qed.
 
-Lemma eq_finite_set T U (A : set T) (B : set U) :
-  A #= B -> finite_set A = finite_set B.
-Proof.
-move=> eqAB; apply/propeqP.
-by split=> -[n Xn]; exists n; move: Xn; rewrite (card_eql eqAB).
-Qed.
-
 Lemma card_le_setD T (A B : set T) : A `\` B #<= A.
-Proof. by apply: subset_card_le; rewrite setDE; apply: subIset; left. Qed.
+Proof. exact/subset_card_le/subDsetl. Qed.
 
-Lemma finite_image T T' A (f : T -> T') : finite_set A -> finite_set (f @` A).
-Proof. exact/card_le_finite/card_image_le. Qed.
+Lemma finite_range T T' (f : T -> T') : finite T -> finite (range f).
+Proof. exact/card_le_finite/card_range_le. Qed.
 
-Lemma finite_set1 T (x : T) : finite_set [set x].
+Lemma finite_image T T' (A : set T) (f : T -> T') : finite A -> finite (f @` A).
+Proof. exact: finite_range. Qed.
+
+Lemma finite1 (T : eqType) (x : T) : finite [set x].
 Proof.
-elim/Pchoice: T => T in x *.
-by apply/finite_fsetP; exists (fset1 x); rewrite set_fset1.
+elim/eqPchoice: T => T in x *.
+by apply/(finite_subfsetP val); exists (fset1 x); rewrite set_fset1 range_val.
 Qed.
-#[global] Hint Resolve finite_set1 : core.
+#[global] Hint Resolve finite1 : core.
 
-Lemma finite_setD T (A B : set T) : finite_set A -> finite_set (A `\` B).
+Lemma finiteD T (A B : set T) : finite A -> finite (A `\` B).
 Proof. exact/card_le_finite/card_le_setD. Qed.
 
-Lemma finite_setU T (A B : set T) :
-  finite_set (A `|` B) = (finite_set A /\ finite_set B).
+Lemma finiteU T (A B : set T) :
+  finite (A `|` B) = (finite A /\ finite B).
 Proof.
-pose fP := @finite_fsetP {classic T}; rewrite propeqE; split.
-  by move=> finAUB; split; apply: sub_finite_set finAUB.
-by case=> /fP[X->]/fP[Y->]; apply/fP; exists (X `|` Y)%fset; rewrite set_fsetU.
+elim/Pchoice: T => T in A B *.
+rewrite propeqE; split.
+  by move=> finAUB; split; apply: sub_finite finAUB.
+case=> /(finite_subfsetP val)[] X + /(finite_subfsetP val)[] Y.
+rewrite !range_val => -> ->.
+apply/(finite_subfsetP val); exists (X `|` Y)%fset.
+by rewrite range_val set_fsetU.
 Qed.
 
-Lemma finite_set2 T (x y : T) : finite_set [set x; y].
-Proof. by rewrite !finite_setU; split; apply: finite_set1. Qed.
-#[global] Hint Resolve finite_set2 : core.
+Lemma finite2 (T : eqType) (x y : T) : finite [set x; y].
+Proof. by rewrite !finiteU; split; apply: finite1. Qed.
+#[global] Hint Resolve finite2 : core.
 
-Lemma finite_set3 T (x y z : T) : finite_set [set x; y; z].
-Proof. by rewrite !finite_setU; do !split; apply: finite_set1. Qed.
-#[global] Hint Resolve finite_set3 : core.
+Lemma finite3 (T : eqType) (x y z : T) : finite [set x; y; z].
+Proof. by rewrite !finiteU; do !split; apply: finite1. Qed.
+#[global] Hint Resolve finite3 : core.
 
-Lemma finite_set4 T (x y z t : T) : finite_set [set x; y; z; t].
-Proof. by rewrite !finite_setU; do !split; apply: finite_set1. Qed.
-#[global] Hint Resolve finite_set4 : core.
+Lemma finite4 (T : eqType) (x y z t : T) : finite [set x; y; z; t].
+Proof. by rewrite !finiteU; do !split; apply: finite1. Qed.
+#[global] Hint Resolve finite4 : core.
 
-Lemma finite_set5 T (x y z t u : T) : finite_set [set x; y; z; t; u].
-Proof. by rewrite !finite_setU; do !split; apply: finite_set1. Qed.
-#[global] Hint Resolve finite_set5 : core.
+Lemma finite5 (T : eqType) (x y z t u : T) : finite [set x; y; z; t; u].
+Proof. by rewrite !finiteU; do !split; apply: finite1. Qed.
+#[global] Hint Resolve finite5 : core.
 
-Lemma finite_set6 T (x y z t u v : T) : finite_set [set x; y; z; t; u; v].
-Proof. by rewrite !finite_setU; do !split; apply: finite_set1. Qed.
-#[global] Hint Resolve finite_set6 : core.
+Lemma finite6 (T : eqType) (x y z t u v : T) : finite [set x; y; z; t; u; v].
+Proof. by rewrite !finiteU; do !split; apply: finite1. Qed.
+#[global] Hint Resolve finite6 : core.
 
-Lemma finite_set7 T (x y z t u v w : T) : finite_set [set x; y; z; t; u; v; w].
-Proof. by rewrite !finite_setU; do !split; apply: finite_set1. Qed.
-#[global] Hint Resolve finite_set7 : core.
+Lemma finite7 (T : eqType) (x y z t u v w : T) : finite [set x; y; z; t; u; v; w].
+Proof. by rewrite !finiteU; do !split; apply: finite1. Qed.
+#[global] Hint Resolve finite7 : core.
 
-Lemma finite_setI T (A B : set T) :
-  (finite_set A \/ finite_set B) -> finite_set (A `&` B).
+Lemma finiteI T (A B : set T) :
+  (finite A \/ finite B) -> finite (A `&` B).
 Proof.
-by case; apply: contraPP; rewrite !infiniteP => /card_le_trans; apply;
-   apply: subset_card_le.
+by case; apply: contraPP => /infiniteP ABfin; apply/infiniteP;
+  apply: (card_le_trans ABfin); apply: subset_card_le.
 Qed.
 
-Lemma finite_setIl T (A B : set T) : finite_set A -> finite_set (A `&` B).
-Proof. by move=> ?; apply: finite_setI; left. Qed.
+Lemma finiteIl T (A B : set T) : finite A -> finite (A `&` B).
+Proof. by move=> ?; apply: finiteI; left. Qed.
 
-Lemma finite_setIr T (A B : set T) : finite_set B -> finite_set (A `&` B).
-Proof. by move=> ?; apply: finite_setI; right. Qed.
+Lemma finiteIr T (A B : set T) : finite B -> finite (A `&` B).
+Proof. by move=> ?; apply: finiteI; right. Qed.
 
 Lemma finite_setX T T' (A : set T) (B : set T') :
-  finite_set A -> finite_set B -> finite_set (A `*` B).
+  finite A -> finite B -> finite (A `*` B).
 Proof.
 elim/Pchoice: T => T in A *; elim/Pchoice: T' => T' in B *.
-move=> /finite_fsetP[{}A ->] /finite_fsetP[{}B ->].
-apply/finite_fsetP; exists (A `*` B)%fset; apply/predeqP => x.
-by split; rewrite /= inE => /andP.
+move=> /(finite_subfsetP val)[] A' + /(finite_subfsetP val)[] B' +.
+rewrite !range_val => -> ->.
+apply/(finite_subfsetP val); exists (A' `*` B')%fset; rewrite range_val.
+by apply/eqP/seteqP => x; rewrite in_setX in_fsetM.
 Qed.
-#[deprecated(since="mathcomp-analysis 1.3.0", note="renamed to finite_setX.")]
-Notation finite_setM := finite_setX (only parsing).
+#[deprecated(since="mathcomp-analysis 1.3.0", note="renamed to finiteX.")]
+Notation finiteM := finite_setX (only parsing).
+
+Lemma finiteX T T' :
+  finite T -> finite T' -> finite (T * T').
+Proof.
+rewrite -(eq_finite (card_setT T)) -(eq_finite (card_setT T')).
+rewrite -(eq_finite (card_setT (T * T'))).
+exact: finite_setX.
+Qed.
+
+(* TODO: move to classical_sets.v *)
+Lemma range2E {TA TB rT : Type} (f : TA -> TB -> rT) :
+  range2 f = range (uncurry f).
+Proof.
+apply/eqP/seteqP => z; apply/asboolP/asboolP => [[] x [] y <-|[][] x y <-].
+  by exists (x, y).
+by exists x, y.
+Qed.
+
+Lemma finite_range2 [aT bT rT : Type] (f : aT -> bT -> rT) :
+  finite aT -> finite bT -> finite [set f x y | x in aT & y in bT].
+Proof. by move=> fA fB; rewrite range2E; apply/finite_range/finiteX. Qed.
 
 Lemma finite_image2 [aT bT rT : Type] [A : set aT] [B : set bT]
     (f : aT -> bT -> rT) :
-  finite_set A -> finite_set B -> finite_set [set f x y | x in A & y in B].
+  finite A -> finite B -> finite [set f x y | x in A & y in B].
 Proof. by move=> fA fB; rewrite image2E; exact/finite_image/finite_setX. Qed.
+
+Lemma finite_range11 [xT aT bT rT : Type]
+    (g : aT -> bT -> rT) (fa : xT -> aT) (fb : xT -> bT) :
+    finite (range fa) -> finite (range fb) ->
+  finite [set g (fa x) (fb x) | x in xT].
+Proof.
+move=> /(finite_image2 g) /[apply]; apply: sub_finite; rewrite image2E.
+by apply/subsetP => r/= /rangeP[x <-]; apply/rangeP; exists (fa x, fb x).
+Qed.
 
 Lemma finite_image11 [xT aT bT rT : Type] [X : set xT]
     (g : aT -> bT -> rT) (fa : xT -> aT) (fb : xT -> bT) :
-    finite_set (fa @` X) -> finite_set (fb @` X) ->
-  finite_set [set g (fa x) (fb x) | x in X].
-Proof.
-move=> /(finite_image2 g) /[apply]; apply: sub_finite_set; rewrite image2E.
-by move=> r/= [x Xx <-]; exists (fa x, fb x) => //; split; exists x.
-Qed.
+    finite (fa @` X) -> finite (fb @` X) ->
+  finite [set g (fa x) (fb x) | x in X].
+Proof. exact: finite_range11. Qed.
 
 Definition fset_set (T : choiceType) (A : set T) :=
-  if pselect (finite_set A) is left Afin
-  then projT1 (cid (finite_fsetP.1 Afin)) else fset0.
+  if pselect (finite A) is left Afin
+  then projT1 (cid ((finite_subfsetP val).1 Afin)) else fset0.
 
-Lemma fset_setK (T : choiceType) (A : set T) : finite_set A ->
+Lemma fset_setK (T : choiceType) (A : set T) : finite A ->
   [set` fset_set A] = A.
-Proof. by rewrite /fset_set; case: pselect => // Afin _; case: cid. Qed.
+Proof.
+rewrite /fset_set; case: pselect => // Afin _; case: cid => /= X /esym.
+by rewrite range_val.
+Qed.
 
-Lemma in_fset_set (T : choiceType) (A : set T) : finite_set A ->
+Lemma in_fset_set (T : choiceType) (A : set T) : finite A ->
   fset_set A =i A.
 Proof.
 by move=> fA x; rewrite -[A in RHS]fset_setK//; apply/idP/idP; rewrite ?inE.
 Qed.
 
 Lemma fset_set_sub (T : choiceType) (A B : set T) :
-  finite_set A -> finite_set B -> A `<=` B = (fset_set A `<=` fset_set B)%fset.
+  finite A -> finite B -> A `<=` B = (fset_set A `<=` fset_set B)%fset.
 Proof.
-move=> finA finB; apply/propext; split=> [AB|/fsubsetP AB t].
-  by apply/fsubsetP => t; rewrite in_fset_set// in_fset_set// 2!inE => /AB.
+move=> finA finB; apply/subsetP/fsubsetP => AB t.
+  by rewrite in_fset_set// in_fset_set// 2!inE => /AB.
 by have := AB t; rewrite !in_fset_set// !inE.
 Qed.
 
-Lemma fset_set_set0 (T : choiceType) (A : set T) : finite_set A ->
+Lemma fset_set_set0 (T : choiceType) (A : set T) : finite A ->
   fset_set A = fset0 -> A = set0.
 Proof.
 move=> finA; rewrite /fset_set; case: pselect => // {}finA.
-by case: cid => _/= -> ->; rewrite set_fset0.
+by case: cid => _/= /[swap] ->; rewrite range_val.
 Qed.
 
 Lemma fset_set0 {T : choiceType} : fset_set (set0 : set T) = fset0.
@@ -747,54 +903,47 @@ by apply/fsetP=> x; rewrite in_fset_set ?inE//; apply/negP; rewrite inE.
 Qed.
 
 Lemma fset_set1 {T : choiceType} (x : T) : fset_set [set x] = [fset x]%fset.
-Proof.
-apply/fsetP=> y; rewrite in_fset_set ?inE//.
-by apply/idP/idP; rewrite inE => /eqP.
-Qed.
+Proof. by apply/fsetP=> y; rewrite in_fset_set ?inE. Qed.
 
 Lemma fset_setU {T : choiceType} (A B : set T) :
-  finite_set A -> finite_set B ->
+  finite A -> finite B ->
   fset_set (A `|` B) = (fset_set A `|` fset_set B)%fset.
 Proof.
 move=> fA fB; apply/fsetP=> x.
-rewrite ?(inE, in_fset_set)//; last by rewrite finite_setU.
-by apply/idP/orP; rewrite ?inE.
+by rewrite ?(inE, in_fset_set)//; last by rewrite finiteU.
 Qed.
 
 Lemma fset_setI {T : choiceType} (A B : set T) :
-  finite_set A -> finite_set B ->
+  finite A -> finite B ->
   fset_set (A `&` B) = (fset_set A `&` fset_set B)%fset.
 Proof.
 move=> fA fB; apply/fsetP=> x.
-rewrite ?(inE, in_fset_set)//; last by apply: finite_setI; left.
-by apply/idP/andP; rewrite ?inE.
+rewrite ?(inE, in_fset_set)//; last by apply: finiteI; left.
 Qed.
 
 Lemma fset_setU1 {T : choiceType} (x : T) (A : set T) :
-  finite_set A -> fset_set (x |` A) = (x |` fset_set A)%fset.
+  finite A -> fset_set (x |` A) = (x |` fset_set A)%fset.
 Proof. by move=> fA; rewrite fset_setU// fset_set1. Qed.
 
 Lemma fset_setD {T : choiceType} (A B : set T) :
-  finite_set A -> finite_set B ->
+  finite A -> finite B ->
   fset_set (A `\` B) = (fset_set A `\` fset_set B)%fset.
 Proof.
 move=> fA fB; apply/fsetP=> x.
-rewrite ?(inE, in_fset_set)//; last exact: finite_setD.
-by apply/idP/andP; rewrite ?inE => -[]; rewrite ?notin_setE.
+rewrite ?(inE, in_fset_set)//; last exact: finiteD.
+by rewrite andbC.
 Qed.
 
 Lemma fset_setD1 {T : choiceType} (x : T) (A : set T) :
-  finite_set A -> fset_set (A `\ x) = (fset_set A `\ x)%fset.
+  finite A -> fset_set (A `\ x) = (fset_set A `\ x)%fset.
 Proof. by move=> fA; rewrite fset_setD// fset_set1. Qed.
 
 Lemma fset_setX {T1 T2 : choiceType} (A : set T1) (B : set T2) :
-    finite_set A -> finite_set B ->
+    finite A -> finite B ->
   fset_set (A `*` B) = (fset_set A `*` fset_set B)%fset.
 Proof.
-move=> Afin Bfin; have ABfin : finite_set (A `*` B) by exact: finite_setX.
-apply/fsetP => i; apply/idP/idP; rewrite !(inE, in_fset_set)//=.
-  by move=> [/mem_set-> /mem_set->].
-by move=> /andP[]; rewrite !inE.
+move=> Afin Bfin; have ABfin : finite (A `*` B) by exact: finite_setX.
+by apply/fsetP => i; apply/idP/idP; rewrite !(inE, in_fset_set).
 Qed.
 #[deprecated(since="mathcomp-analysis 1.3.0", note="renamed to fset_setX.")]
 Notation fset_setM := fset_setX (only parsing).
@@ -806,42 +955,42 @@ Definition snd_fset (T1 T2 : choiceType) (A : {fset (T1 * T2)}) : {fset T2} :=
 Notation "A .`1" := (fst_fset A) : fset_scope.
 Notation "A .`2" := (snd_fset A) : fset_scope.
 
-Lemma finite_set_fst (T1 T2 : choiceType) (A : set (T1 * T2)) :
-  finite_set A -> finite_set A.`1.
-Proof.
-move=> /finite_fsetP[B A_B]; apply/finite_fsetP; exists (B.`1)%fset.
-by apply/seteqP; split=> [x/= [y]|_/= /imfsetP[[x1 x2]/= +] ->]; rewrite A_B;
-  [move=> xyB; apply/imfsetP; exists (x, y)|move=> ?; exists x2].
-Qed.
+Lemma finite_fst (T1 T2 : choiceType) (A : set (T1 * T2)) :
+  finite A -> finite A.`1.
+Proof. exact: finite_image. Qed.
 
-Lemma finite_set_snd (T1 T2 : choiceType) (A : set (T1 * T2)) :
-  finite_set A -> finite_set A.`2.
-Proof.
-move=> /finite_fsetP[B A_B]; apply/finite_fsetP; exists (B.`2)%fset.
-apply/seteqP; split=> [y/= [x]|_/= /imfsetP[[x1 x2]/= +] ->]; rewrite A_B;
-  by [move=> xyB; apply/imfsetP; exists (x, y)|move=> ?; exists x1].
-Qed.
+Lemma finite_snd (T1 T2 : choiceType) (A : set (T1 * T2)) :
+  finite A -> finite A.`2.
+Proof. exact: finite_image. Qed.
 
 Lemma bigcup_finite {I T} (D : set I) (F : I -> set T) :
-    finite_set D -> (forall i, D i -> finite_set (F i)) ->
-  finite_set (\bigcup_(i in D) F i).
+    finite D -> (forall i : D, finite (F i)) ->
+  finite (\bigcup_(i in D) F i).
 Proof.
 elim/Pchoice: I => I in D F *.
-elim/Ppointed: T => T in F *; first by rewrite emptyE.
+elim/Pchoice: T => T in F *.
 move=> Dfin Ffin; pose G (i : fset_set D) := fset_set (F (val i)).
 suff: (\bigcup_(i in D) F i #<= [set: {i & G i}])%card.
   by move=> /card_le_finite; apply; apply: finite_finset.
-apply/pcard_geP/surjPex.
+rewrite (card_le_eqr (card_setT _)); apply/pfcard_geP; right; apply/surjPex.
+have GD : forall (k : {i : fset_set D & G i}),
+    val (projT2 k) \in \bigcup_(i in D) F i.
+  case=> i x.
+  move: (valP i); rewrite in_fset_set//= => iD.
+  apply/in_bigcupP; exists (val i) => /=.
+  move: (valP x); rewrite in_fset_set//; apply: (Ffin (fsval i)).
 exists (fun (k : {i : fset_set D & G i}) => val (projT2 k)).
-move=> y [i Di Fky]/=.
-have Dk : i \in fset_set D by rewrite in_fset_set// inE.
-pose k : fset_set D := [` Dk]%fset.
-have Gy : y \in G k by rewrite in_fset_set ?inE//; apply: Ffin.
-by exists (Tagged G [` Gy]%fset).
+apply/subsetP => y _.
+rewrite -image_setT -(image_inj val_inj) image_comp/comp/=.
+case: y => y/= /in_bigcupP[] i yF.
+have iD : val i \in fset_set D by move: (valP i); rewrite in_fset_set.
+have yG : y \in G [` iD]%fset by rewrite in_fset_set//; apply: Ffin.
+by apply/rangeP; exists (existT G [` iD]%fset [` yG]%fset).
 Qed.
 
+(* TODO
 Lemma trivIset_sum_card (T : choiceType) (F : nat -> set T) n :
-  (forall n, finite_set (F n)) -> trivIset [set: nat] F ->
+  (forall n, finite (F n)) -> trivIset [set: nat] F ->
   (\sum_(i < n) #|` fset_set (F i)| =
    #|` fset_set (\big[setU/set0]_(k < n) F k)|)%N.
 Proof.
@@ -855,54 +1004,52 @@ rewrite (@trivIset_bigsetUI _ xpredT)// ?fset_set0//.
 by rewrite [X in trivIset X F](_ : _ = [set: nat])//; exact/seteqP.
 Qed.
 
-Lemma finite_setXR (T T' : choiceType) (A : set T) (B : T -> set T') :
-  finite_set A -> (forall x, A x -> finite_set (B x)) -> finite_set (A `*`` B).
+Lemma finiteXR (T T' : choiceType) (A : set T) (B : T -> set T') :
+  finite A -> (forall x, A x -> finite (B x)) -> finite (A `*`` B).
 Proof.
 move=> Afin Bfin; rewrite -bigcupX1l.
-by apply: bigcup_finite => // i Ai; exact/finite_setX/Bfin.
+by apply: bigcup_finite => // i Ai; exact/finiteX/Bfin.
 Qed.
-#[deprecated(since="mathcomp-analysis 1.3.0", note="renamed to finite_setXR.")]
-Notation finite_setMR := finite_setXR (only parsing).
+#[deprecated(since="mathcomp-analysis 1.3.0", note="renamed to finiteXR.")]
+Notation finiteMR := finiteXR (only parsing).
 
-Lemma finite_setXL (T T' : choiceType) (A : T' -> set T) (B : set T') :
-  (forall x, B x -> finite_set (A x)) -> finite_set B -> finite_set (A ``*` B).
+Lemma finiteXL (T T' : choiceType) (A : T' -> set T) (B : set T') :
+  (forall x, B x -> finite (A x)) -> finite B -> finite (A ``*` B).
 Proof.
 move=> Afin Bfin; rewrite -bigcupX1r.
-by apply: bigcup_finite => // i Ai; apply/finite_setX => //; exact: Afin.
+by apply: bigcup_finite => // i Ai; apply/finiteX => //; exact: Afin.
 Qed.
-#[deprecated(since="mathcomp-analysis 1.3.0", note="renamed to finite_setXL.")]
-Notation finite_setML := finite_setXL (only parsing).
+#[deprecated(since="mathcomp-analysis 1.3.0", note="renamed to finiteXL.")]
+Notation finiteML := finiteXL (only parsing).
 
+ *)
 Lemma fset_set_II n : fset_set `I_n = [fset val i | i in 'I_n]%fset.
 Proof.
 apply/fsetP => i; rewrite /= ?inE in_fset_set//.
-apply/idP/imfsetP; rewrite ?inE/=.
-  by move=> lt_in; exists (Ordinal lt_in).
-by move=> [j _ ->].
+apply/idP/imfsetP => [lt_in|[j _ ->]]; last exact: valP.
+by exists (Ordinal lt_in).
 Qed.
 
 Lemma set_fsetK (T : choiceType) (A : {fset T}) : fset_set [set` A] = A.
-Proof.
-apply/fsetP => x; rewrite in_fset_set//=.
-by apply/idP/idP; rewrite ?inE.
-Qed.
+Proof. by apply/fsetP => x; rewrite in_fset_set//=; apply: finite_subfset. Qed.
 
 Lemma fset_set_image {T U : choiceType} (f : T -> U) (A : set T) :
-  finite_set A -> fset_set (f @` A) = (f @` fset_set A)%fset.
+  finite A -> fset_set (f @` A) = (f @` fset_set A)%fset.
 Proof.
 move=> Afset; apply/fsetP=> i.
 rewrite !in_fset_set; last exact: finite_image.
-apply/idP/imfsetP; rewrite !inE/=.
-  by move=> [x Ax <-]; exists x; rewrite ?in_fset_set ?inE.
-by move=> [x + ->]; rewrite in_fset_set// inE; exists x.
+apply/imageP/imfsetP => -[x] => [[]xA <-|xA ->]; exists x => //.
+  by rewrite in_fset_set.
+by rewrite in_fset_set in xA.
 Qed.
 
 Lemma fset_set_inj {T : choiceType} (A B : set T) :
-  finite_set A -> finite_set B -> fset_set A = fset_set B -> A = B.
+  finite A -> finite B -> fset_set A = fset_set B -> A = B.
 Proof. by move=> Afin Bfin /(congr1 pred_set); rewrite !fset_setK. Qed.
 
+(*TODO
 Lemma bigsetU_fset_set T (I : choiceType) (A : set I) (F : I -> set T) :
-  finite_set A -> \big[setU/set0]_(i <- fset_set A) F i =\bigcup_(i in A) F i.
+  finite A -> \big[setU/set0]_(i <- fset_set A) F i =\bigcup_(i in A) F i.
 Proof.
 move=> finA; rewrite -bigcup_fset /fset_set; case: pselect => [{}finA|//].
 apply/seteqP; split=> [x [i /=]|x [i Ai Fix]].
@@ -911,47 +1058,47 @@ by exists i => //; case: cid => // B AB /=; move: Ai; rewrite AB.
 Qed.
 
 Lemma __deprecated__bigcup_fset_set T (I : choiceType) (A : set I) (F : I -> set T) :
-  finite_set A -> \bigcup_(i in A) F i = \big[setU/set0]_(i <- fset_set A) F i.
+  finite A -> \bigcup_(i in A) F i = \big[setU/set0]_(i <- fset_set A) F i.
 Proof. by move=> /bigsetU_fset_set->. Qed.
 #[deprecated(note="Use -bigsetU_fset_set instead")]
 Notation bigcup_fset_set := __deprecated__bigcup_fset_set (only parsing).
 
 Lemma bigsetU_fset_set_cond T (I : choiceType) (A : set I) (F : I -> set T)
-    (P : pred I) : finite_set A ->
+    (P : pred I) : finite A ->
   \big[setU/set0]_(i <- fset_set A | P i) F i = \bigcup_(i in A `&` P) F i.
 Proof.
 by move=> *; rewrite bigcup_mkcondr big_mkcond -bigsetU_fset_set ?mem_setE.
 Qed.
 
 Lemma __deprecated__bigcup_fset_set_cond T (I : choiceType) (A : set I) (F : I -> set T)
-    (P : pred I) : finite_set A ->
+    (P : pred I) : finite A ->
   \bigcup_(i in A `&` P) F i = \big[setU/set0]_(i <- fset_set A | P i) F i.
 Proof. by move=> /bigsetU_fset_set_cond->. Qed.
 #[deprecated(note="Use -bigsetU_fset_set_cond instead")]
 Notation bigcup_fset_set_cond := __deprecated__bigcup_fset_set_cond (only parsing).
 
 Lemma bigsetI_fset_set T (I : choiceType) (A : set I) (F : I -> set T) :
-  finite_set A -> \big[setI/setT]_(i <- fset_set A) F i =\bigcap_(i in A) F i.
+  finite A -> \big[setI/setT]_(i <- fset_set A) F i =\bigcap_(i in A) F i.
 Proof.
 by move=> *; apply: setC_inj; rewrite setC_bigcap setC_bigsetI bigsetU_fset_set.
 Qed.
 
 Lemma __deprecated__bigcap_fset_set T (I : choiceType) (A : set I) (F : I -> set T) :
-  finite_set A -> \bigcap_(i in A) F i = \big[setI/setT]_(i <- fset_set A) F i.
+  finite A -> \bigcap_(i in A) F i = \big[setI/setT]_(i <- fset_set A) F i.
 Proof. by move=> /bigsetI_fset_set->. Qed.
 #[deprecated(note="Use -bigsetI_fset_set instead")]
 Notation bigcap_fset_set := __deprecated__bigcap_fset_set (only parsing).
 
 Lemma bigsetI_fset_set_cond T (I : choiceType) (A : set I) (F : I -> set T)
-    (P : pred I) : finite_set A ->
+    (P : pred I) : finite A ->
   \big[setI/setT]_(i <- fset_set A | P i) F i = \bigcap_(i in A `&` P) F i.
 Proof.
 by move=> *; rewrite bigcap_mkcondr big_mkcond -bigsetI_fset_set ?mem_setE.
 Qed.
 
-Lemma super_bij T U (X A : set T) (Y B : set U) (f : {bij X >-> Y}) :
+Lemma super_bij T U (X A : set T) (Y B : set U) (f : {splitbij X >-> Y}) :
   X `<=` A -> Y `<=` B -> A `\` X #= B `\` Y ->
-  exists g : {bij A >-> B}, {in X, g =1 f}.
+  exists g : {splitbij A >-> B}, {in X, val \o g =1 val \o f}.
 Proof.
 elim/Ppointed: U => U in Y B f *.
   rewrite !emptyE in f * => XA _; rewrite setD_eq0 => AX.
@@ -984,26 +1131,26 @@ Lemma card_fset_set {T : choiceType} (A : set T) n :
   A #= `I_n -> #|`fset_set A| = n.
 Proof.
 move=> An; apply/card_eq_fsetP; rewrite fset_setK//.
-by apply/finite_setP; exists n.
+by apply/finiteP; exists n.
 Qed.
 
 Lemma geq_card_fset_set {T : choiceType} (A : set T) n :
   A #<= `I_n -> (#|`fset_set A| <= n)%N.
 Proof.
-move=> An; have /finite_setP[m Am] : finite_set A
-  by apply/finite_set_leP; exists n.
+move=> An; have /finiteP[m Am] : finite A
+  by apply/finite_leP; exists n.
 by rewrite (card_fset_set Am) -card_le_II -(card_le_eql Am).
 Qed.
 
 Lemma leq_card_fset_set {T : choiceType} (A : set T) n :
-  finite_set A -> A #>= `I_n -> (#|`fset_set A| >= n)%N.
+  finite A -> A #>= `I_n -> (#|`fset_set A| >= n)%N.
 Proof.
-move=> /finite_setP[m Am]; rewrite (card_fset_set Am).
+move=> /finiteP[m Am]; rewrite (card_fset_set Am).
 by rewrite (card_le_eqr Am) card_le_II.
 Qed.
 
-Lemma infinite_set_fset {T : choiceType} (A : set T) n :
-  infinite_set A ->
+Lemma infinite_fset {T : choiceType} (A : set T) n :
+  infinite A ->
     exists2 B : {fset T}, [set` B] `<=` A & (#|` B| >= n)%N.
 Proof.
 elim/choicePpointed: T => T in A *; first by rewrite emptyE.
@@ -1014,51 +1161,75 @@ rewrite fset_set_image// card_imfset//= fset_set_II/=.
 by rewrite card_imfset//= ?size_enum_ord//; apply: val_inj.
 Qed.
 
-Lemma infinite_set_fsetP {T : choiceType} (A : set T) :
-  infinite_set A <->
+Lemma infinite_fsetP {T : choiceType} (A : set T) :
+  infinite A <->
    forall n, exists2 B : {fset T}, [set` B] `<=` A & (#|` B| >= n)%N.
 Proof.
-split; first by move=> ? ?; apply: infinite_set_fset.
+split; first by move=> ? ?; apply: infinite_fset.
 elim/choicePpointed: T => T in A *.
   move=> /(_ 1%N)[B _]; rewrite cardfs_gt0 => /fset0Pn[x xB].
   by have: [set` B] x by []; rewrite emptyE.
-move=> Bge /finite_setP[n An]; have [B BA] := Bge n.+1.
+move=> Bge /finiteP[n An]; have [B BA] := Bge n.+1.
 apply/negP; rewrite -leqNgt -(card_fset_set An) fsubset_leq_card//.
 apply/fsubsetP => x /BA; rewrite in_fset_set ?inE//.
-by apply/finite_setP; exists n.
+by apply/finiteP; exists n.
 Qed.
 
 Lemma fcard_eq {T T' : choiceType} (A : set T) (B : set T') :
-    finite_set A -> finite_set B ->
+    finite A -> finite B ->
   reflect (#|`fset_set A| = #|`fset_set B|) (A #= B).
 Proof.
-move=> /finite_setP/cid[n An] /finite_setP/cid[m Bm].
+move=> /finiteP/cid[n An] /finiteP/cid[m Bm].
 rewrite (card_fset_set An) (card_fset_set Bm).
 by rewrite (card_eql An) (card_eqr Bm); apply: card_eq_II.
+Qed.
+ *)
+
+Lemma range_comp {T U V} (f : T -> U) (g : U -> V) :
+  g @` (range f) = range (g \o f).
+Proof.
+by rewrite -[range f]image_setT image_comp image_setT.
 Qed.
 
 Lemma card_IID {n k} : `I_n `\` `I_k #= `I_(n - k)%N.
 Proof.
-apply/fcard_eq => //; first exact: finite_setD.
+apply/card_bijP.
+have nk (i : `I_n `\` `I_k) : (val i - k)%N \in `I_(n - k).
+  move: (valP i) => /andP[]; rewrite !in_mkset -leqNgt => ilt ki.
+  by rewrite ltn_sub2rE.
+exists (fun i : `I_n `\` `I_k => (val i - k)%N).
+split=> [i j /(congr1 val)/= ij|].
+  apply: val_inj; case: i j ij => i /andP[] + + [] j/= /andP[] + + /eqP.
+  rewrite !in_mkset -!leqNgt => ilt ki jlt kj.
+  by rewrite eqn_sub2rE => /eqP.
+apply/subsetP => -[] j jlt _.
+rewrite -(image_inj val_inj) range_comp /comp/=.
+have jnk : (j + k)%N \in `I_n `\` `I_k.
+  by rewrite !in_mkset -leqNgt leq_addl andbT addnC -ltn_subRL.
+by apply/rangeP; exists (j + k)%N; rewrite /= addnK.
+  (*TODO: restore old proof once I fix the previousTODOs.
+apply/fcard_eq => //; first exact: finiteD.
 rewrite fset_setD//= cardfsD/= -fset_setI// setI_II.
 rewrite !fset_set_II !card_imfset// /= !size_enum_ord.
 by case: leqP; rewrite // subnn => /eqP->.
+   *)
 Qed.
 
-Lemma finite_set_bij T (A : set T) n S : A != set0 ->
+(*
+Lemma finite_bij T (A : set T) n S : A != set0 ->
     A #= `I_n -> S `<=` A ->
   exists (f : {bij `I_n >-> A}) k, (k <= n)%N /\ `I_n `&` (f @^-1` S) = `I_k.
 Proof.
 elim/Ppointed: T => T in A S *; first by rewrite !emptyE eqxx.
 move=> AN0 An SA; have [k kn Sk] : exists2 k, (k <= n)%N & S #= `I_k.
-  have /finite_setP[k Sk]: finite_set S by apply: sub_finite_set SA _; exists n.
+  have /finiteP[k Sk]: finite S by apply: sub_finite SA _; exists n.
   exists k => //; rewrite -card_le_II.
   by rewrite -(card_le_eqr An) -(card_le_eql Sk); apply: subset_card_le.
 have /card_esym/ppcard_eqP[f] := Sk.
 have eqAS : A `\` S #= `I_n `\` `I_k.
   have An' := An; have Sk' := Sk.
-  do [have /finite_fsetP[{An'}A ->] : finite_set A by exists n] in An AN0 SA *.
-  do [have /finite_fsetP[{Sk'}S ->] : finite_set S by exists k] in Sk f SA *.
+  do [have /finite_fsetP[{An'}A ->] : finite A by exists n] in An AN0 SA *.
+  do [have /finite_fsetP[{Sk'}S ->] : finite S by exists k] in Sk f SA *.
   have [/card_eq_fsetP {}An /card_eq_fsetP {}Sk] := (An, Sk).
   rewrite -set_fsetD (card_eqr card_IID); apply/card_eq_fsetP.
   by rewrite cardfsD (fsetIidPr _) ?An ?Sk //; apply/fsubsetP.
@@ -1067,82 +1238,84 @@ have [{}g ->] := pPbij 'bij_g => /= gE.
 exists [bij of g^-1], k; split=> //=; rewrite -inv_sub_image //= invV.
 by under eq_imagel do rewrite /= gE ?inE//; rewrite image_eq.
 Qed.
-
+ *)
 #[deprecated(note="use countable0 instead")]
 Notation countable_set0 := countable0 (only parsing).
 
-Lemma countable1 T (x : T) : countable [set x].
-Proof. exact: finite_set_countable. Qed.
+Lemma countable1 (T : eqType) (x : T) : countable [set x].
+Proof. exact: finite_countable. Qed.
 #[global] Hint Resolve countable1 : core.
 
 Lemma countable_fset (T : choiceType) (X : {fset T}) : countable [set` X].
-Proof. exact: finite_set_countable. Qed.
+Proof. exact/finite_countable/finite_subfset. Qed.
 #[global] Hint Resolve countable_fset : core.
 
 Lemma countable_finpred (T : finType) (pT : predType T) (P : pT) : countable [set` P].
-Proof. exact: finite_set_countable. Qed.
+Proof. exact: finite_countable. Qed.
 #[global] Hint Extern 0 (is_true (countable [set` _])) => solve [apply: countable_finpred] : core.
 
-Lemma eq_card_nat T (A : set T):
-  countable A -> ~ finite_set A -> A #= [set: nat].
-Proof. by move=> Acnt /infiniteP leNA; rewrite card_eq_le leNA andbT. Qed.
+Lemma eq_card_nat T :
+  countable T -> ~ finite T -> T #= nat.
+Proof. by move=> Acnt /infiniteP leNT; rewrite card_eq_le leNT andbT. Qed.
 
-Lemma infinite_nat : ~ finite_set [set: nat].
+Lemma infinite_nat : ~ finite nat.
 Proof. exact/infiniteP/card_lexx. Qed.
 
-Lemma infinite_prod_nat : infinite_set [set: nat * nat].
-Proof.
-by apply/infiniteP/pcard_leTP/injPex; exists (pair 0%N) => // m n _ _ [].
-Qed.
+Lemma infinite_prod_nat : infinite (nat * nat).
+Proof. by apply/infiniteP/card_leP/injPex; exists (pair 0%N) => // m n []. Qed.
 
-Lemma card_nat2 : [set: nat * nat] #= [set: nat].
+Lemma card_nat2 : nat * nat #= nat.
 Proof. exact/eq_card_nat/infinite_prod_nat/countableP. Qed.
 
+(* TODO: What is this doing here? *)
 HB.instance Definition _ := isPointed.Build rat 0.
 
-Lemma infinite_rat : infinite_set [set: rat].
+Lemma infinite_rat : infinite rat.
 Proof.
-apply/infiniteP/pcard_leTP/injPex; exists (GRing.natmul 1) => // m n _ _.
-exact/Num.Theory.mulrIn/oner_neq0.
+apply/infiniteP/card_leP/injPex; exists (GRing.natmul 1) => // m n.
+exact: Num.Theory.mulrIn.
 Qed.
 
-Lemma card_rat : [set: rat] #= [set: nat].
+Lemma card_rat : rat #= nat.
 Proof. exact/eq_card_nat/infinite_rat/countableP. Qed.
 
-Lemma choicePcountable {T : choiceType} : countable [set: T] ->
+Lemma choicePcountable {T : choiceType} : countable T ->
   {T' : countType | T = T' :> Type}.
 Proof.
-move=> /pcard_leP/unsquash f.
-pose TcM := PCanIsCountable (in1TT 'funoK_f).
+move=> /card_leP/unsquash f.
+pose TcM := PCanIsCountable (@funoK _ _ f).
 pose TC : countType := HB.pack T TcM.
 by exists TC.
 Qed.
 
-Lemma eqPcountable {T : eqType} : countable [set: T] ->
+Lemma eqPcountable {T : eqType} : countable T ->
   {T' : countType | T = T' :> Type}.
 Proof. by elim/eqPchoice: T => T /choicePcountable. Qed.
 
-Lemma Pcountable {T : Type} : countable [set: T] ->
+Lemma Pcountable {T : Type} : countable T ->
   {T' : countType | T = T' :> Type}.
 Proof. by elim/Pchoice: T => T /choicePcountable. Qed.
 
-Lemma bigcup_countable {I T} (D : set I) (F : I -> set T) :
-    countable D -> (forall i, D i -> countable (F i)) ->
-  countable (\bigcup_(i in D) F i).
+Lemma bigcup_countable {I T} (F : I -> set T) :
+    countable I -> (forall i, countable (F i)) ->
+  countable (\bigcup_i F i).
 Proof.
-elim/Ppointed: T => T in F *; first by rewrite emptyE.
-rewrite -(eq_countable (card_setT _)) => cD cF; rewrite bigcup_set_type.
-set G := (fun i : D => F (val i)).
-have {cF}cG i : countable (G i) by apply: cF; apply: set_valP.
-move: (D : Type) cD G cG => {F I}_ /Pcountable[{}D ->] G cG.
-suff: (\bigcup_i G i #<= [set: {i & G i}])%card.
-  have cGT i : countable [set: G i] by rewrite (eq_countable (card_setT _)).
-  have /all_sig[H GE] := fun i => Pcountable (cGT i).
-  by move=> /sub_countable->//; rewrite (eq_fun GE).
-apply/pcard_geP/surjPex; exists (fun (k : {i & G i}) => val (projT2 k)).
-by move=> x [i _] Gix/=; exists (Tagged G (SigSub (mem_set Gix))).
+move: F => /[swap] /Pcountable[] {}I -> F cF.
+suff: (\bigcup_i F i #<= {i & F i})%card.
+  have /all_sig[G GE] := fun i => Pcountable (cF i).
+  move=> /sub_countable; apply.
+  by rewrite (eq_fun GE); apply: countableP.
+apply/pfcard_geP; right; apply/surjPex.
+have fP (k : {i & F i}) : val (projT2 k) \in \bigcup_i F i.
+  by case: k => i x/=; apply/in_bigcupP; exists i.
+exists (fun (k : {i & F i}) => val (projT2 k)).
+apply/subsetP => x _.
+rewrite -(image_inj val_inj) range_comp /comp/=.
+case: x => x/= /in_bigcupP[] i xi.
+by apply/rangeP; exists (existT F i (x : F i)).
 Qed.
 
+(* TODO:
 Lemma countableXR T T' (A : set T) (B : T -> set T') :
   countable A -> (forall i, A i -> countable (B i)) -> countable (A `*`` B).
 Proof.
@@ -1173,7 +1346,7 @@ Qed.
 Notation countableML := countableXL (only parsing).
 
 Lemma infiniteXRl T T' (A : set T) (B : T -> set T') :
-  infinite_set A -> (forall i, B i !=set0) -> infinite_set (A `*`` B).
+  infinite A -> (forall i, B i !=set0) -> infinite (A `*`` B).
 Proof.
 move=> /infiniteP/pcard_geP[f] /(_ _)/cid-/all_sig[b Bb].
 apply/infiniteP/pcard_geP/surjPex; exists (fun x => f x.1).
@@ -1221,17 +1394,17 @@ by do !split=> //; [exact: BD | apply: subset_trans _ BD; apply: subDsetl].
 Qed.
 
 Lemma countable_finite_subset {T : Type} (D : set T) :
-  countable D -> countable [set A | A `<=` D /\ finite_set A ].
+  countable D -> countable [set A | A `<=` D /\ finite A ].
 Proof.
-move=> Dcnt; suff -> : [set A | A `<=` D /\ finite_set A ] =
+move=> Dcnt; suff -> : [set A | A `<=` D /\ finite A ] =
     \bigcup_n [set A | A `<=` D /\ A #= `I_n ].
   by apply: bigcup_countable => // ? _; exact: countable_n_subset.
-rewrite eqEsubset; split=> [A [AD /finite_setP[n An]]|A]; first by exists n.
-by move=> [n _ [AD An]]; split=> //; apply/finite_setP; exists n.
+rewrite eqEsubset; split=> [A [AD /finiteP[n An]]|A]; first by exists n.
+by move=> [n _ [AD An]]; split=> //; apply/finiteP; exists n.
 Qed.
 
 Lemma eq_card_fset_subset {T : pointedType} (D : set T) :
-  [set A | A `<=` D /\ finite_set A ] #= [set A : {fset T} | {subset A <= D}] .
+  [set A | A `<=` D /\ finite A ] #= [set A : {fset T} | {subset A <= D}] .
 Proof.
 apply/card_set_bijP; exists (@fset_set T); split.
 - by move=> A [AD fsetA] /= x; rewrite in_fset_set // ?inE; exact: AD.
@@ -1246,14 +1419,14 @@ Proof.
 rewrite -(eq_countable (eq_card_fset_subset _)) => ?.
 exact: countable_finite_subset.
 Qed.
-
+ *)
 HB.mixin Record FiniteImage aT rT (f : aT -> rT) := {
-  fimfunP : finite_set (range f)
+  fimfunP : finite (range f)
 }.
 HB.structure Definition FImFun aT rT := {f of @FiniteImage aT rT f}.
 
 Arguments fimfunP {aT rT} _.
-#[global] Hint Extern 0 (finite_set _) => solve [apply: fimfunP] : core.
+#[global] Hint Extern 0 (finite _) => solve [apply: fimfunP] : core.
 
 Reserved Notation "{ 'fimfun' aT >-> T }"
   (at level 0, format "{ 'fimfun'  aT  >->  T }").
@@ -1263,8 +1436,11 @@ Notation "{ 'fimfun' aT >-> T }" := (@FImFun.type aT T) : form_scope.
 Notation "[ 'fimfun' 'of' f ]" := [the {fimfun _ >-> _} of f] : form_scope.
 
 Lemma fimfun_inP {aT rT} (f : {fimfun aT >-> rT}) (D : set aT) :
-  finite_set (f @` D).
-Proof. by apply: (@sub_finite_set _ _ (range f)) => // y [x]; exists x. Qed.
+  finite (f @` D).
+Proof.
+apply: (@sub_finite _ _ (range f)); last exact: fimfunP.
+by rewrite -[X in _ `<=` X]image_setT; apply/image_subset/subsetT.
+Qed.
 
 #[global] Hint Resolve fimfun_inP : core.
 
@@ -1276,7 +1452,7 @@ Proof. by rewrite -(image_comp f g) fset_set_image. Qed.
 
 Section fimfun_pred.
 Context {aT rT : Type}.
-Definition fimfun : {pred aT -> rT} := mem [set f | finite_set (range f)].
+Definition fimfun : {pred aT -> rT} := mem [set f | `[< finite (range f) >]].
 Definition fimfun_key : pred_key fimfun.
 Proof. exact. Qed.
 Canonical fimfun_keyed := KeyedPred fimfun_key.
@@ -1288,7 +1464,7 @@ Notation T := {fimfun aT >-> rT}.
 Notation fimfun := (@fimfun aT rT).
 Section Sub.
 Context (f : aT -> rT) (fP : f \in fimfun).
-Definition fimfun_Sub_subproof := @FiniteImage.Build aT rT f (set_mem fP).
+Definition fimfun_Sub_subproof := @FiniteImage.Build aT rT f (elimTF (asboolP _) fP).
 #[local] HB.instance Definition _ := fimfun_Sub_subproof.
 Definition fimfun_Sub := [fimfun of f].
 End Sub.
@@ -1297,7 +1473,9 @@ Lemma fimfun_rect (K : T -> Type) :
   (forall f (Pf : f \in fimfun), K (fimfun_Sub Pf)) -> forall u : T, K u.
 Proof.
 move=> Ksub [f [[Pf]]]/=.
-by suff -> : Pf = (set_mem (@mem_set _ [set f | _] f Pf)) by apply: Ksub.
+move: (Ksub _ (introT (asboolP _) Pf)).
+congr (K (FImFun.Pack (FImFun.Class (FiniteImage.Axioms_ _ _ _)))).
+exact: Prop_irrelevance.
 Qed.
 
 Lemma fimfun_valP f (Pf : f \in fimfun) : fimfun_Sub Pf = f :> (_ -> _).
@@ -1317,11 +1495,11 @@ HB.instance Definition _ aT (rT : choiceType) :=
   [Choice of {fimfun aT >-> rT} by <:].
 
 Lemma finite_image_cst {aT rT : Type} (x : rT) :
-  finite_set (range (cst x : aT -> _)).
+  finite (range (cst x : aT -> _)).
 Proof.
-elim/Ppointed: aT => aT; rewrite ?emptyE ?image_set0//.
-suff -> : cst x @` [set: aT] = [set x] by apply: finite_set1.
-by apply/predeqP => y; split=> [[t' _ <-]//|->//] /=; exists point.
+elim/Pchoice: rT => rT in x *.
+suff /sub_finite: range (@cst aT _ x) `<=` [set x] by apply; apply: finite1.
+by apply/subsetP => y /rangeP[] z <-.
 Qed.
 
 HB.instance Definition _ aT rT x :=
@@ -1333,15 +1511,16 @@ Lemma fimfun_cst aT rT x : @cst_fimfun aT rT x =1 cst x. Proof. by []. Qed.
 
 Lemma comp_fimfun_subproof aT rT sT
    (f : {fimfun aT >-> rT}) (g : rT -> sT) : @FiniteImage aT sT (g \o f).
-Proof. by split; rewrite -(image_comp f g); apply: finite_image. Qed.
+Proof. by split; rewrite -(range_comp f g); apply: finite_image. Qed.
 HB.instance Definition _ aT rT sT f g := @comp_fimfun_subproof aT rT sT f g.
 
 Section zmod.
 Context (aT : Type) (rT : zmodType).
 Lemma fimfun_zmod_closed : zmod_closed (@fimfun aT rT).
 Proof.
-split=> [|f g]; rewrite !inE/=; first exact: finite_image_cst.
-by move=> fA gA; apply: (finite_image11 (fun x y => x - y)).
+split=> [|f g /asboolP fA /asboolP gA]; apply/asboolP.
+  exact: finite_image_cst.
+exact: (finite_range11 (fun x y => x - y)).
 Qed.
 HB.instance Definition _ :=
   GRing.isZmodClosed.Build (aT -> rT) fimfun fimfun_zmod_closed.

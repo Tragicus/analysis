@@ -391,7 +391,7 @@ End memType_subType.
 
 Module Exports. HB.reexport. End Exports.
 End MemType_subType.
-Import MemType_subType.Exports.
+Export MemType_subType.Exports.
 
 HB.instance Definition _ (T : eqType) (A : set T) := [Equality of A by <:].
 HB.instance Definition _ (T : choiceType) (A : set T) := [Choice of A by <:].
@@ -1595,6 +1595,16 @@ Qed.
 
 Lemma Iiota (n : nat) : [set` iota 0 n] = `I_n.
 Proof. by apply/eqP/seteqP => ?; rewrite /= mem_iota add0n. Qed.
+
+Definition ordII {n} (k : 'I_n) : `I_n :=
+  let kn : val k \in `I_n := valP k in val k.
+Definition IIord {n} (k : `I_n) := Ordinal (valP k).
+
+Definition ordIIK {n} : cancel (@ordII n) IIord.
+Proof. by move=> k; apply/val_inj. Qed.
+
+Lemma IIordK {n} : cancel (@IIord n) ordII.
+Proof. by move=> k; apply/val_inj. Qed.
 
 Lemma setC_I n : ~` `I_n = [set k | n <= k].
 Proof. by rewrite -set_predC; apply: eq_set => k; apply/esym/leqNgt. Qed.

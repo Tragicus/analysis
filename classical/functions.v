@@ -132,6 +132,8 @@ Set Implicit Arguments.
 Unset Strict Implicit.
 Unset Printing Implicit Defensive.
 
+Local Open Scope classical_set_scope.
+
 Reserved Notation "f \_ D" (at level 10).
 Reserved Notation "'{' 'fun' A '>->' B '}'"
   (format "'{' 'fun'  A  '>->'  B '}'").
@@ -227,6 +229,18 @@ Reserved Notation "''injpPfun_' dflt"
   (at level 8, dflt at level 2, format "''injpPfun_' dflt").
 Reserved Notation "''funpPinj_' dflt"
   (at level 8, dflt at level 2, format "''funpPinj_' dflt").
+
+Definition surjective {aT rT} (f : aT -> rT) := setT `<=` range f.
+Notation splitbijective := bijective.
+Definition bijective {aT rT} (f : aT -> rT) := injective f /\ surjective f.
+
+Lemma surjective_compl {aT rT sT} (f : aT -> rT) (g : rT -> sT) :
+  surjective (g \o f) -> surjective g.
+Proof. by move=> /subsetP gf; apply/subsetP => y /gf/rangeP[] x <-. Qed.
+
+Lemma can_surj {aT rT} (f : aT -> rT) (g : rT -> aT) :
+  cancel f g -> surjective g.
+Proof. by move=> fg; apply/subsetP => y _; rewrite -[y]fg. Qed.
 
 HB.mixin Record OInv {aT rT} (f : aT -> rT) := { oinv : rT -> option aT }.
 HB.structure Definition OInversible aT rT := {f of OInv aT rT f}.
@@ -573,21 +587,22 @@ Proof. by split=> x; exists x. Qed.
 HB.instance Definition _ := some_fun_subproof.
 
 End Some.
-
+ *)
 Section OApply.
 Context {aT rT} {A : set aT} {B : set rT} {b0 : rT}.
 Local Notation oapp f := (oapp f b0).
 
 HB.instance Definition _ {f : {oinv aT >-> rT}} :=
-  Inv.Build _ _ (oapp f) 'oinv_f.
+  Inv.Build _ _ (oapp f) (oinv f).
 
-Lemma inv_oapp {f : {oinv aT >-> rT}} : (oapp f)^-1 = 'oinv_f.
+Lemma inv_oapp {f : {oinv aT >-> rT}} : (oapp f)^-1 = oinv f.
 Proof. by []. Qed.
-Lemma oinv_oapp  {f : {oinv aT >-> rT}} : 'oinv_(oapp f) = olift 'oinv_f.
-Proof. by rewrite -inv_oapp. Qed.
+Lemma oinv_oapp  {f : {oinv aT >-> rT}} : oinv (oapp f) = olift (oinv f).
+Proof. by []. Qed.
 Lemma inv_oappV {f : {inv aT >-> rT}} : olift f^-1 = (oapp f)^-1.
 Proof. by rewrite inv_oapp -oliftV. Qed.
 
+(*TODO
 Lemma oapp_can_subproof (f : {inj A >-> rT}) : Inv_Can _ _ (some @` A) (oapp f).
 Proof. by split=> x /set_mem[a Aa <-]/=; rewrite inv_oapp funoK ?inE. Qed.
 HB.instance Definition _ f := oapp_can_subproof f.
@@ -606,9 +621,10 @@ HB.instance Definition _ (f : {injfun A >-> B}) := Fun.on (oapp f).
 HB.instance Definition _ (f : {surjfun A >-> B}) := Fun.on (oapp f).
 HB.instance Definition _ (f : {bij A >-> B}) := Fun.on (oapp f).
 HB.instance Definition _ (f : {splitbij A >-> B}) := Fun.on (oapp f).
+ *)
 
 End OApply.
-
+(*
 Section OBind.
 Context {aT rT} {A : set aT} {B : set (option rT)}.
 Local Notation b f := (oapp f None).
@@ -632,14 +648,13 @@ HB.instance Definition _ (f : {surjfun A >-> B}) := Fun.on (obind f).
 HB.instance Definition _ (f : {bij A >-> B}) := Fun.on (obind f).
 End OBind.
  *)
-
 Section Composition.
 Context {aT rT sT : Type}.
 
 (*
 Local Lemma comp_fun_subproof (f : {fun A >-> B}) (g : {fun B >-> C}) :
   isFun _ _ A C (g \o f).
-Proof. by split => x /'funS_f; apply: funS. Qed.
+Proof. by split=> x /'funS_f; apply: funS. Qed.
 HB.instance Definition _ f g := comp_fun_subproof f g.
  *)
 
@@ -720,31 +735,61 @@ HB.instance Definition _ (f : {surjfun A >-> B}) := Fun.on (olift f).
 HB.instance Definition _ (f : {bij A >-> B}) := Fun.on (olift f).
 
 End Olift.
+*)
 
 Section Map.
-Context {aT rT} {A : set aT} {B : set rT}.
+Context {aT rT : Type}.
 Local Notation m f := (obind (olift f)).
 
-HB.instance Definition _ (f : {fun A >-> B}) := Fun.copy (omap f) (m f).
+Definition oswap {T} (x : option (option T)) :=
+  match x with
+  | None => Some None
+  | Some None => None
+  | x => x
+  end.
 
 HB.instance Definition _ {f : {oinv aT >-> rT}} :=
-  Inv.Build _ _ (omap f) (obind 'oinv_f).
+  OInv.Build _ _ (omap f) (oswap \o (omap (oinv f))).
 
-Lemma inv_omap {f : {oinv aT >-> rT}} : (omap f)^-1 = obind 'oinv_f.
+Lemma oinv_omap {f : {oinv aT >-> rT}} : oinv (omap f) = oswap \o (omap (oinv f)).
 Proof. by []. Qed.
-Lemma oinv_omap {f : {oinv aT >-> rT}} : 'oinv_(omap f) = olift (obind 'oinv_f).
-Proof. by []. Qed.
+
+Lemma olift_omapV {f : {inv aT >-> rT}} : olift (omap f^-1) = oinv (omap f).
+Proof. by apply: funext; case=> // x; rewrite oinv_omap -oliftV/=. Qed.
+
+HB.instance Definition _ {f : {inv aT >-> rT}} :=
+  OInv_Inv.Build _ _ (omap f) olift_omapV.
+
 Lemma omapV {f : {inv aT >-> rT}} : omap f^-1 = (omap f)^-1.
-Proof. by rewrite inv_omap -oliftV. Qed.
+Proof. by []. Qed.
+Lemma inv_omap {f : {inv aT >-> rT}} : (omap f)^-1 = obind (oinv f).
+Proof. by rewrite -oliftV. Qed.
 
-HB.instance Definition _ (f : {oinvfun A >-> B}) := Fun.on (omap f).
-HB.instance Definition _ (f : {inj A >-> rT}) := Inject.copy (omap f) (m f).
-HB.instance Definition _ (f : {injfun A >-> B}) := Fun.on (omap f).
-HB.instance Definition _ (f : {surj A >-> B}) := Surject.copy (omap f) (m f).
-HB.instance Definition _ (f : {surjfun A >-> B}) := Fun.on (omap f).
-HB.instance Definition _ (f : {bij A >-> B}) := Fun.on (omap f).
+Lemma oinv_omapS {f : {surj aT >-> rT}} x : oinv (omap f) x.
+Proof.
+by case: x=> // x; rewrite oinv_omap/=; case: (oinv f x) (@oinvS _ _ f x).
+Qed.
+
+Lemma oinv_omapK {f : {surj aT >-> rT}} : ocancel (oinv (omap f)) (omap f).
+Proof.
+case=> // x; rewrite oinv_omap/=.
+by case: (oinv f x) (@oinvK _ _ f x) => //= y ->.
+Qed.
+
+HB.instance Definition _ {f : {surj aT >-> rT}} :=
+  OInv_CanV.Build _ _ (omap f) oinv_omapS oinv_omapK.
+
+HB.instance Definition _ {f : {splitsurj aT >-> rT}} := Inversible.on (omap f).
+
+Lemma omapoK {f : {inj aT >-> rT}} : pcancel (omap f) (oinv (omap f)).
+Proof. by case=> // x; rewrite oinv_omap/= funoK. Qed.
+
+HB.instance Definition _ {f : {inj aT >-> rT}} :=
+  OInv_Can.Build _ _ (omap f) omapoK.
+
+HB.instance Definition _ {f : {splitinj aT >-> rT}} := Inversible.on (omap f).
+HB.instance Definition _ {f : {splitbij aT >-> rT}} := Inversible.on (omap f).
 End Map.
- *)
 
 (** Builders *)
 
@@ -805,16 +850,16 @@ HB.builders Context {aT rT} (f : aT -> rT) of Can2 _ _ f.
   HB.instance Definition _ := Inv_Can2.Build aT rT f funK invK.
 HB.end.
 
-HB.factory Record SplitInjFun_CanV {aT rT} (f : aT -> rT) of
+HB.factory Record SplitInj_CanV {aT rT} (f : aT -> rT) of
      @SplitInj _ _ f :=
   { injV : injective f^-1 }.
-HB.builders Context {aT rT} (f : aT -> rT) of SplitInjFun_CanV _ _ f.
+HB.builders Context {aT rT} (f : aT -> rT) of SplitInj_CanV _ _ f.
   Local Lemma invK : cancel f^-1 f.
   Proof. by move=> x; apply/injV/funK. Qed.
   HB.instance Definition _ := Inv_CanV.Build aT rT f invK.
 HB.end.
 
-HB.factory Record BijTT {aT rT} (f : aT -> rT) := { bij : bijective f }.
+HB.factory Record BijTT {aT rT} (f : aT -> rT) := { bij : splitbijective f }.
 HB.builders Context {aT rT} f of BijTT aT rT f.
   Local Lemma exg : {g | cancel f g /\ cancel g f}.
   Proof. by apply: cid; case: bij => g; exists g. Qed.
@@ -824,7 +869,10 @@ HB.end.
 (** Fun in *)
 
 (* TODO: move to classical_sets.v *)
-Lemma 
+Lemma image_setT aT rT (f : aT -> rT) : (f @` setT)%classic = range f.
+Proof.
+by apply/eqP/seteqP => y; apply/imageP/rangeP => -[] x => [[_]|] <-; exists x.
+Qed.
 
 Section default_oinv.
 Context {aT rT} (f : aT -> rT).
@@ -835,6 +883,13 @@ Definition default_oinv (y : rT) : option aT :=
   | true => fun yf => some (projT1 (cid (elimTF (rangeP f y) yf)))
   end erefl.
 
+Lemma default_oinvE (y : rT) (yf : y \in range f) :
+  default_oinv y = some (projT1 (cid (elimTF (rangeP f y) yf))).
+Proof.
+rewrite /default_oinv; move: erefl; rewrite {2 3} yf => e.
+by congr Some; congr projT1; congr cid; apply: Prop_irrelevance.
+Qed.
+
 Lemma default_oinvK : ocancel default_oinv f.
 Proof.
 rewrite /default_oinv => y.
@@ -842,13 +897,8 @@ case: {2 3}(y \in range f) erefl => //= e.
 by case: (cid _).
 Qed.
 
-Lemma default_oinvS : (setT `<=` f @` setT)%classic -> forall y, default_oinv y.
-Proof.
-move=> /subsetP /[swap] y /(_ y erefl).
-Set Printing All.
-Search range setT.
-; rewrite /default_oinv.
-
+Lemma default_oinvS : surjective f -> forall y, default_oinv y.
+Proof. by move=> /subsetP /[swap] y /(_ y erefl) yf; rewrite default_oinvE. Qed.
 
 End default_oinv.
 
@@ -876,21 +926,25 @@ Coercion surjective_ocanV {aT rT} {A : set aT} {B : set rT} {f : aT -> rT}
    *)
 
 Section surj_inv.
-Context {aT rT} {f : aT -> rT} (fsurj : (setT `<=` f @` setT)%classic).
+Context {aT rT} {f : aT -> rT} (fsurj : surjective f).
 
-Let fsurj' : forall y, exists x, f x = y.
+Let fsurj' y : default_oinv f y.
 Proof.
-move: fsurj => /asboolP fsurj' y.
-by move: (fsurj' y erefl) => /imageP[] x [] _ yE; exists x.
+have yf : (y \in range f)%classic by apply/(subsetP fsurj).
+by rewrite default_oinvE. 
 Qed.
 
-Let surjective_inv (y : rT) : aT := projT1 (cid (fsurj' y)).
+Let surjective_inv (y : rT) : aT := oextract (fsurj' y).
 
 Lemma surjective_invK : cancel surjective_inv f.
-Proof. by rewrite /surjective_inv => x; case: cid. Qed.
+Proof.
+rewrite /surjective_inv => y.
+have yf : (y \in range f)%classic by apply/(subsetP fsurj).
+by move: (fsurj' y); rewrite default_oinvE; case: cid.
+Qed.
 End surj_inv.
 Coercion surjective_canV {aT rT} {f : aT -> rT}
-    (fS : (setT `<=` f @` setT)%classic) :=
+    (fS : surjective f) :=
   CanV.Build aT rT f (surjective_invK fS).
 
 (*
@@ -919,7 +973,7 @@ Notation "'surj_  f" := (phant_surj (Phantom (_ -> _) f)) : form_scope.
  *)
 
 Section Psurj.
-Context {aT rT} {f : aT -> rT} (fsurj : (setT `<=` f @` setT)%classic).
+Context {aT rT} {f : aT -> rT} (fsurj : surjective f).
 
 #[local] HB.instance Definition _ : CanV _ _ f := fsurj.
 Definition surjection_of_surj := [splitsurj of f].
@@ -928,15 +982,18 @@ Lemma Psurj : {s : {splitsurj aT >-> rT} | f = s}. Proof. by exists [splitsurj o
 End Psurj.
 Coercion surjection_of_surj : is_true >-> SplitSurj.type.
 
+Lemma oinv_surj {aT rT} {f : aT -> rT}
+   (fS : surjective f) y :
+ oinv fS y = default_oinv f y.
+Proof. exact: Some_oextract. Qed.
+
+Lemma surj {aT rT} {f : {surj aT >-> rT}} : surjective f.
+Proof.
+apply/subsetP => b _; apply/rangeP.
+by case: (oinvP f b) (oinv f b) => a _ _; exists a.
+Qed.
+
 (*
-Lemma oinv_surj {aT rT} {A : set aT} {B : set rT} {f : aT -> rT}
-   (fS : set_surj A B f) y :
- 'oinv_fS y = if pselect (B y) is left By then some (projT1 (cid2 (fS y By))) else None.
-Proof. by []. Qed.
-
-Lemma surj {aT rT} {A : set aT} {B : set rT} {f : {surj A >-> B}} : set_surj A B f.
-Proof. by move=> b /'oinvP_f[x Ax _]; exists x. Qed.
-
 Definition phant_surj aT rT (A : set aT) (B : set rT) (f : {surj A >-> B})
   of phantom (_ -> _) f := @surj _ _ _ _ f.
 Notation "'surj_  f" := (phant_surj (Phantom (_ -> _) f)) : form_scope.
@@ -967,7 +1024,6 @@ Notation "[ 'fun' f 'in' A ]" := (funin A f) : function_scope.
 
 (** Partial injection *)
 
-(*
 Section split.
 Context {aT rT} (A : set aT) (B : set rT).
 Definition split_ (dflt : rT -> aT) (f : aT -> rT) := f.
@@ -975,89 +1031,93 @@ Definition split_ (dflt : rT -> aT) (f : aT -> rT) := f.
 Context (dflt : rT -> aT).
 Local Notation split := (split_ dflt).
 
-HB.instance Definition _ (f : {fun A >-> B}) := Fun.on (split f).
-
 Section oinv.
 Context (f : {oinv aT >-> rT}).
-Let g y := odflt (dflt y) ('oinv_f y).
+Let g y := odflt (dflt y) (oinv f y).
 HB.instance Definition _  := Inv.Build _ _ (split f) g.
 Lemma splitV : (split f)^-1 = g. Proof. by []. Qed.
 End oinv.
-HB.instance Definition _ (f : {oinvfun A >-> B}) := Fun.on (split f).
 
-Lemma splitis_inj_subproof (f : {inj A >-> rT}) : Inv_Can _ _ A (split f).
-Proof. by split=> x Ax; rewrite splitV funoK. Qed.
+Lemma splitis_inj_subproof (f : {inj aT >-> rT}) : Inv_Can _ _ (split f).
+Proof. by split=> x; rewrite splitV funoK. Qed.
 HB.instance Definition _ f := splitis_inj_subproof f.
-HB.instance Definition _ (f : {injfun A >-> B}) := Inject.on (split f).
+HB.instance Definition _ (f : {inj aT >-> rT}) := Inject.on (split f).
 
-Lemma splitid (f : {splitinjfun A >-> B}) : (split f)^-1 = f^-1.
+Lemma splitid (f : {splitinj aT >-> rT}) : (split f)^-1 = f^-1.
 Proof. by apply/funext => x; apply: Some_inj; rewrite splitV -oliftV. Qed.
 
-Lemma splitsurj_subproof (f : {surj A >-> B}) : Inv_CanV _ _ A B (split f).
-Proof. by split=> [+|+ /set_mem] => b Bb; rewrite splitV; case: oinvP. Qed.
+Lemma splitsurj_subproof (f : {surj aT >-> rT}) : Inv_CanV _ _ (split f).
+Proof. by split=> b; rewrite splitV; case: oinvP. Qed.
 
 HB.instance Definition _ f := splitsurj_subproof f.
-HB.instance Definition _ (f : {surjfun A >-> B}) := Surject.on (split f).
-HB.instance Definition _ (f : {bij A >-> B}) := Surject.on (split f).
+HB.instance Definition _ (f : {splitbij aT >-> rT}) := Surject.on (split f).
 
 End split.
 Notation "''split_' a" := (split_ a) : form_scope.
 Notation split := 'split_(fun=> point).
- *)
+
 (** More Builders *)
 
 HB.factory Record Inj {aT rT} (f : aT -> rT) := { inj : injective f }.
 HB.builders Context {aT rT} (f : aT -> rT) of Inj _ _ f.
-  HB.instance Definition _ := OInversible.copy f [fun f in A].
-  Lemma funoK : {in A, pcancel f 'oinv_f}.
+  HB.instance Definition _ := OInv.Build _ _ f (default_oinv f).
+  Lemma funoK : pcancel f (oinv f).
   Proof.
-  move=> x /set_mem Ax; rewrite oinv_surj.
-  case: pselect => //=; last by case; exists x.
-  by move=> ?; case: cid2 => //= y Ay /inj; rewrite !inE => ->.
+  by move=> x; rewrite /oinv/= default_oinvE; case: cid => y/= /inj ->.
   Qed.
-  HB.instance Definition _ := OInv_Can.Build _ _ _ f funoK.
+  HB.instance Definition _ := OInv_Can.Build _ _ f funoK.
 HB.end.
 
-HB.factory Record SurjFun_Inj {aT rT} {A : set aT} {B : set rT} (f : aT -> rT) of
-   @SurjFun _ _ A B f := { inj : {in A &, injective f} }.
-HB.builders Context {aT rT} {A : set aT} {B : set rT} (f : aT -> rT) of
-    @SurjFun_Inj _ _ A B f.
+HB.factory Record Surject_Inj {aT rT} (f : aT -> rT) of
+   @Surject _ _ f := { inj : injective f }.
+HB.builders Context {aT rT} (f : aT -> rT) of
+    @Surject_Inj _ _ f.
   Let g := f.
-  HB.instance Definition _ := Inj.Build _ _ A g inj.
-  Let fcan : OInv_Can aT rT A f.
+  HB.instance Definition _ := Inj.Build _ _ g inj.
+  Let fcan : OInv_Can aT rT f.
   Proof.
-  split=> x /set_mem Ax; apply: 'inj_(omap g); rewrite ?mem_fun ?inE//=.
-  by rewrite /g -oinvV/= funoK// ?mem_fun ?inE.
+  by split=> x; apply: (inj_omap inj); rewrite -oinvV/= funoK.
   Qed.
  HB.instance Definition _ := fcan.
 HB.end.
 
-HB.factory Record SplitSurjFun_Inj {aT rT} {A : set aT} {B : set rT} (f : aT -> rT) of
-     @SplitSurjFun _ _ A B f :=
-   { inj : {in A &, injective f} }.
-HB.builders Context {aT rT} {A : set aT} {B : set rT} (f : aT -> rT) of
-    @SplitSurjFun_Inj _ _ A B f.
-  Local Lemma funK : {in A, cancel f f^-1%FUN}.
-  Proof.  by move=> x Ax; apply: inj; rewrite ?invK ?mem_fun. Qed.
-  HB.instance Definition _ := Inv_Can.Build aT rT _ f funK.
+HB.factory Record SplitSurj_Inj {aT rT} (f : aT -> rT) of
+     @SplitSurj _ _ f :=
+   { inj : injective f }.
+HB.builders Context {aT rT} (f : aT -> rT) of
+    @SplitSurj_Inj _ _ f.
+  Local Lemma funK : cancel f f^-1%FUN.
+  Proof.  by move=> x; apply: inj; rewrite invK. Qed.
+  HB.instance Definition _ := Inv_Can.Build aT rT f funK.
 HB.end.
 
-Section Inverses.
-Context aT rT {A : set aT} {B : set rT}.
-HB.instance Definition _ (f : {inj A >-> rT}) :=
-  SurjFun_Inj.Build _ _ _ _ [fun f in A] 'inj_f.
-End Inverses.
+(* TODO: where should I put this? *)
+Lemma split_bijectiveP {aT rT} (f : aT -> rT) :
+  bijective f <-> splitbijective f.
+Proof.
+split=> [[]finj fsurj|[]g fg gf].
+  exists (fsurj ^-1); last exact: invK.
+  by move=> x; apply/finj/(@invK _ _ fsurj).
+by split; [apply: can_inj|apply: can_surj].
+Qed.
 
+  (*TODO
+Section Inverses.
+Context (aT rT : Type).
+HB.instance Definition _ (f : {inj aT >-> rT}) :=
+  SurjFun_Inj.Build _ _ _ _ [fun f in aT] 'inj_f.
+End Inverses.
+   *)
 (**md**************************************************************************)
 (* ## Simple Factories                                                        *)
 (******************************************************************************)
-
 Section Pinj.
-Context {aT rT} {A : set aT} {f : aT -> rT} (finj : {in A &, injective f}).
-#[local] HB.instance Definition _ := Inj.Build _ _ _ f finj.
-Lemma Pinj : {i : {inj A >-> rT} | f = i}. Proof. by exists [inj of f]. Qed.
+Context {aT rT} {f : aT -> rT} (finj : injective f).
+#[local] HB.instance Definition _ := Inj.Build _ _ f finj.
+Lemma Pinj : {i : {inj aT >-> rT} | f = i}. Proof. by exists [inj of f]. Qed.
 End Pinj.
 
+(*TODO
 Section Pfun.
 Context {aT rT} {A : set aT} {B : set rT} {f : aT -> rT}
   (ffun : {homo f : x / A x >-> B x}).
@@ -1142,121 +1202,107 @@ Lemma PsplitsurjT {aT rT} {f : aT -> rT} {g} : cancel g f ->
 Proof.
 by move/in1W/(@funPsplitsurj _ _ _ _ [fun of totalfun f] [fun of totalfun g]).
 Qed.
-
+ *)
 (**md**************************************************************************)
 (* ## Instances                                                               *)
 (******************************************************************************)
 
 (** The identity is a split bijection *)
 
-HB.instance Definition _ T A := @Can2.Build T T A A idfun idfun
-   (fun x y => y) (fun x y => y) (fun _ _ => erefl) (fun _ _ => erefl).
+HB.instance Definition _ T := @Can2.Build T T idfun idfun
+   (fun _ => erefl) (fun _ => erefl).
 
 (** Iteration preserves Fun, Injectivity, and Surjectivity *)
 Section iter_inv.
-
-Context {aT} {A : set aT}.
-
-Local Lemma iter_fun_subproof n (f : {fun A >-> A}) : isFun _ _ A A (iter n f).
-Proof.
-split => x; elim: n => // n /[apply] ?; apply/(fun_image_sub f).
-by exists (iter n f x).
-Qed.
-
-HB.instance Definition _ n f := iter_fun_subproof n f.
+Context {aT : Type}.
 
 Section OInv.
 Context {f : {oinv aT >-> aT}}.
 HB.instance Definition _ n := OInv.Build _ _ (iter n f)
-  (iter n (obind 'oinv_f) \o some).
-Lemma oinv_iter n : 'oinv_(iter n f) = iter n (obind 'oinv_f) \o some.
+  (iter n (obind (oinv f)) \o some).
+Lemma oinv_iter n : oinv (iter n f) = iter n (obind (oinv f)) \o some.
 Proof. by []. Qed.
 End OInv.
 
-Section OInv.
+Section Inv.
 Context {f : {inv aT >-> aT}}.
-Lemma some_iter_inv n : olift (iter n f^-1) = 'oinv_(iter n f).
+Lemma some_iter_inv n : olift (iter n f^-1) = oinv (iter n f).
 Proof.
 elim: n => // n IH; rewrite iterfSr olift_comp IH ?oinv_iter -compA.
-rewrite (_ : Some \o f^-1 = 'oinv_f); first by rewrite iterfSr; congr (_ \o _).
+rewrite (_ : Some \o f^-1 = oinv f); first by rewrite iterfSr; congr (_ \o _).
 by apply/funeqP => ? /=; rewrite some_inv.
 Qed.
 HB.instance Definition _ n := OInv_Inv.Build _ _ (iter n f) (some_iter_inv n).
 Lemma inv_iter n : (iter n f)^-1 = iter n f^-1. Proof. by []. Qed.
-End OInv.
+End Inv.
 
-Lemma iter_can_subproof n (f : {injfun A >-> A}) : OInv_Can aT aT A (iter n f).
+Lemma iter_can_subproof n (f : {inj aT >-> aT}) : OInv_Can aT aT (iter n f).
 Proof.
-split=> x Ax; rewrite oinv_iter /=; elim: n=> // n IH.
-by rewrite iterfSr /= funoK //; exact: mem_fun.
+split=> x; rewrite oinv_iter /=; elim: n=> // n IH.
+by rewrite iterfSr /= funoK.
 Qed.
 
 HB.instance Definition _ f g := iter_can_subproof f g.
-HB.instance Definition _ n (f : {injfun A >-> A}) := Inject.on (iter n f).
-HB.instance Definition _ n (f : {splitinjfun A >-> A}) := Inject.on (iter n f).
+HB.instance Definition _ n (f : {splitinj aT >-> aT}) := Inject.on (iter n f).
 End iter_inv.
 
 Section iter_surj.
-Context {aT} {A : set aT}.
+Context {aT : Type}.
 
-Lemma iter_surj_subproof n (f : {surj A >-> A}) : OInv_CanV _ _ A A (iter n f).
+Lemma iter_surj_subproof n (f : {surj aT >-> aT}) : OInv_CanV _ _ (iter n f).
 Proof.
-split; first exact: funS.
-elim: n=> // n IH; rewrite oinv_iter iterfSr iterfS.
-apply: (@ocan_in_comp _ _ _ (mem A)) => //; last exact: oinvK.
-elim: n {IH} => // n IH x Ax; move: (IH _ Ax); rewrite pred_oapp_set ?inE.
-case=> y Ay /= ynf; case: (@oinvS _ _ _ _ f _ Ay) => z ? zfinv; exists z => //.
-by rewrite zfinv /= -ynf.
+split; rewrite oinv_iter; elim: n=> // n IH/=.
+  by move=> x; move: (IH x) => /=; case: (iter _ _ _) => //= y _; apply: oinvS.
+
+rewrite iterfS/= iterfSr; apply: ocan_comp => //; exact: oinvK.
 Qed.
 
 HB.instance Definition _ n f := iter_surj_subproof n f.
-HB.instance Definition _ n (f : {splitsurj A >-> A}) := Surject.on (iter n f).
-HB.instance Definition _ n (f : {surjfun A >-> A}) := Surject.on (iter n f).
-HB.instance Definition _ n (f : {splitsurjfun A >-> A}) :=
-  Surject.on (iter n f).
-HB.instance Definition _ n (f : {bij A >-> A}) := Surject.on (iter n f).
-HB.instance Definition _ n (f : {splitbij A >-> A}) := Surject.on (iter n f).
+HB.instance Definition _ n (f : {splitsurj aT >-> aT}) := Surject.on (iter n f).
+HB.instance Definition _ n (f : {splitbij aT >-> aT}) := Surject.on (iter n f).
 
 End iter_surj.
+
+(** val *)
+HB.instance Definition _ T P U := Inj.Build _ _ val (@val_inj T P U).
 
 (** Unbind *)
 
 Section Unbind.
-Context {aT rT} {A : set aT} {B : set rT} (dflt : aT -> rT).
+Context {aT rT} (dflt : aT -> rT).
 Definition unbind (f : aT -> option rT) x := odflt (dflt x) (f x).
-
-Lemma unbind_fun_subproof (f : {fun A >-> some @` B}) : isFun _ _ A B (unbind f).
-Proof. by rewrite /unbind; split=> x /'funS_f [y Bu <-]. Qed.
-HB.instance Definition _ f := unbind_fun_subproof f.
 
 Section Oinv.
 Context (f : {oinv aT >-> option rT}).
-HB.instance Definition _ := OInv.Build _ _ (unbind f) ('oinv_f \o some).
+HB.instance Definition _ := OInv.Build _ _ (unbind f) (oinv f \o some).
 
-Lemma oinv_unbind : 'oinv_(unbind f) = 'oinv_f \o some. Proof. by []. Qed.
+Lemma oinv_unbind : oinv (unbind f) = oinv f \o some. Proof. by []. Qed.
 End Oinv.
-HB.instance Definition _ (f : {oinvfun A >-> some @` B}) := Fun.on (unbind f).
 
 Section Inv.
 Context (f : {inv aT >-> option rT}).
-Lemma inv_unbind_subproof : olift (f^-1 \o some) = 'oinv_(unbind f).
+Lemma inv_unbind_subproof : olift (f^-1 \o some) = oinv (unbind f).
 Proof. by rewrite olift_comp oliftV. Qed.
 HB.instance Definition _ := OInv_Inv.Build _ _ (unbind f) inv_unbind_subproof.
 
 Lemma inv_unbind : (unbind f)^-1 = f^-1 \o some. Proof. by []. Qed.
 End Inv.
-HB.instance Definition _ (f : {invfun A >-> some @` B}) := Fun.on (unbind f).
 
-Lemma unbind_inj_subproof (f : {injfun A >-> some @` B}) :
-   @OInv_Can _ _ A (unbind f).
+Lemma unbind_inj_subproof (f : {inj aT >-> (some @` rT)%classic}) :
+  @OInv_Can _ _ (unbind (val \o f)).
 Proof.
-split=> x Ax; rewrite oinv_unbind /unbind/=; have <- := 'funoK_f Ax.
-by have [y By /= <-] := 'funS_f (set_mem Ax).
+split=> x; rewrite oinv_unbind /unbind/=.
+rewrite oinv_comp/= funoK/= -(@funoK _ _ f x); congr oinv.
+apply: val_inj => /=.
+by case: (f x) => y/= /[dup] /imageP[] z [_] <- zP.
 Qed.
 HB.instance Definition _ f := unbind_inj_subproof f.
-HB.instance Definition _ (f : {splitinjfun A >-> some @` B}) :=
-  Inject.on (unbind f).
+(*TODO: This does not work because the return type for Inv and for Inject are not the same.
+HB.instance Definition _ (f : {splitinj aT >-> (some @` rT)%classic}) :=
+  Inject.on (unbind (val \o f)).
+ *)
 
+(*TODO
 Lemma unbind_surj_subproof (f : {surj A >-> some @` B}) :
    @OInv_CanV _ _ A B (unbind f).
 Proof.
@@ -1273,20 +1319,22 @@ HB.instance Definition _ (f : {splitsurjfun A >-> some @` B}) :=
   Surject.on (unbind f).
 HB.instance Definition _ (f : {bij A >-> some @` B}) := Surject.on (unbind f).
 HB.instance Definition _ (f : {splitbij A >-> some @` B}) := Bij.on (unbind f).
+ *)
 
 End Unbind.
 
+(*TODO
 (** Odflt *)
 
 Section Odflt.
-Context {T} {A : set T} (x : T).
+Context {T} (x : T).
 
 Lemma odflt_unbind : odflt x = unbind (fun=> x) idfun. Proof. by []. Qed.
 
 HB.instance Definition _ := Inv.Build _ _ (odflt x) some.
 
 HB.instance Definition _ := SplitBij.copy (odflt x)
-  [the {splitbij some @` A >-> A} of @unbind (option T) T (fun=> x) idfun].
+  [the {splitbij (some @` T)%classic >-> T} of @unbind (option T) T (fun=> x) idfun].
 
 End Odflt.
 
@@ -1314,20 +1362,45 @@ HB.instance Definition _ := SplitBij.copy (insubd x0)
 Lemma inv_insubd : (insubd x0)^-1 = val. Proof. by []. Qed.
 
 End SubType.
+ *)
+
+(** swap *)
+
+Section swap.
+Context {T : eqType}.
+Implicit Types (a b : T).
+
+Definition swap a b x :=
+  if x == a then b else if x == b then a else x.
+
+Lemma swapK a b : cancel (swap a b) (swap b a).
+Proof.
+move=> x; apply/eqP; rewrite /swap !(fun_if, if_arg) !eqxx.
+have [//|/negPf xa] := eqVneq x a.
+have [<-|//] := eqVneq x b.
+by rewrite eq_sym xa.
+Qed.
+
+Lemma swap_bijective a b : splitbijective (swap a b).
+Proof. exists (swap b a); exact: swapK. Qed.
+
+HB.instance Definition _ a b := BijTT.Build _ _ (swap a b) (swap_bijective a b).
+
+End swap.
 
 (** To setT *)
 
-Definition to_setT {T} (x : T) : [set: T] :=
-  @SigSub _ _ _ x (mem_set I : x \in setT).
-HB.instance Definition _ T := Can.Build T [set: T] setT to_setT
-  ((fun _ _ => erefl) : {in setT, cancel to_setT val}).
-HB.instance Definition _ T := isFun.Build T _ setT setT to_setT (fun _ _ => I).
+Definition to_setT {T} (x : T) : [set: T] := x.
+HB.instance Definition _ T := Can.Build T [set: T] to_setT
+  ((fun _ => erefl) : cancel to_setT val).
 HB.instance Definition _ T :=
-  SplitInjFun_CanV.Build T _ _ _ to_setT (fun x y => I) inj.
+  SplitInj_CanV.Build T _ to_setT val_inj.
+(*TOTHINK: What is the point of this?
 Definition setTbij {T} := [splitbij of @to_setT T].
+ *)
 
 Lemma inv_to_setT T : (@to_setT T)^-1 = val. Proof. by []. Qed.
-
+(*TODO
 (** Subfun *)
 
 Section subfun.
@@ -1383,27 +1456,30 @@ Proof. by split; rewrite /seteqfun//; move=> x _; apply/val_inj. Qed.
 HB.instance Definition _ := seteqfun_can2_subproof.
 
 End seteqfun.
-
+ *)
 (** Inclusion *)
 
 Section incl.
-Context  {T} {A B : set T}.
-Definition incl (AB : A `<=` B) := @id T.
+Context {T : Type}.
+Implicit Types (A B : set T).
+Definition incl {A B} (AB : A `<=` B) (a : A) : B :=
+  let _ := (subsetP AB (val a) (valP a)) in val a.
 
-HB.instance Definition _ (AB : A `<=` B) := Inv.Build _ _ (incl AB) id.
-HB.instance Definition _ (AB : A `<=` B) := isFun.Build _ _ A B (incl AB) AB.
-HB.instance Definition _ (AB : A `<=` B) :=
-  Inv_Can.Build _ _ A (incl AB) (fun _ _ => erefl).
+Lemma incl_inj {A B} (AB : A `<=` B) : injective (incl AB).
+Proof. by move=> a b /(congr1 val) ab; apply: val_inj. Qed.
 
-Definition eqincl (AB : A = B) := incl (subsetW AB).
-HB.instance Definition _ AB := Inversible.on (eqincl AB).
-Lemma eqincl_surj AB : Inv_Can2 _ _ A B (eqincl AB).
-Proof. by split=> // x; rewrite /eqincl /incl/= /(_^-1)/inv/= AB. Qed.
-HB.instance Definition _ AB := eqincl_surj AB.
+HB.instance Definition _ A B (AB : A `<=` B) := Inj.Build _ _ (incl AB) (@incl_inj _ _ AB).
+
+Definition eqincl {A B} (AB : A = B) := incl (subsetW AB).
+HB.instance Definition _ A B (AB : A = B) :=
+  Inv.Build _ _ (eqincl AB) (eqincl (esym AB)).
+Lemma eqincl_surj {A B} (AB : A = B) : Inv_Can2 _ _ (eqincl AB).
+Proof. by split=> x; apply: val_inj. Qed.
+HB.instance Definition _ A B (AB : A = B) := eqincl_surj AB.
 
 End incl.
-Notation inclT A := (incl (@subsetT _ _)).
-
+Notation inclT A := (incl (@subsetT _ A)).
+(*TODO
 (** Ad hoc function *)
 
 Section mkfun.
@@ -1434,53 +1510,45 @@ End set_val.
 #[global]
 Hint Extern 0 (is_true (set_val _ \in _)) => solve [apply: valP] : core.
 
+ *)
 (** Squash *)
 
-HB.instance Definition _ T := CanV.Build T $|T| setT setT squash (fun _ _ => I)
-                              (in1W unsquashK).
+HB.instance Definition _ T := CanV.Build T $|T| squash unsquashK.
 HB.instance Definition _ T := SplitInj.copy (@unsquash T) squash^-1%FUN.
 Definition ssquash {T} := [splitsurj of @squash T].
-
+ 
 (** pickle and unpickle *)
 
 HB.instance Definition _ (T : countType) :=
-  Inj.Build _ _ setT (@choice.pickle T) (in2W (pcan_inj choice.pickleK)).
-HB.instance Definition _ (T : countType) :=
-  isFun.Build _ _ setT setT (@choice.pickle T) (fun _ _ => I).
+  Inj.Build _ _ (@choice.pickle T) (pcan_inj choice.pickleK).
 
 (** set0fun *)
 
 Lemma set0fun_inj {P T} : injective (@set0fun P T).
-Proof. by case=> x x0; have := set_mem x0. Qed.
+Proof. by case. Qed.
 
 HB.instance Definition _ P T :=
-  Inj.Build (@set0 T) P setT set0fun (in2W set0fun_inj).
-HB.instance Definition _ P T :=
-  isFun.Build _ _ setT setT (@set0fun P T) (fun _ _ => I).
+  Inj.Build (@set0 T) P set0fun set0fun_inj.
 
 (** cast_ord *)
 
 HB.instance Definition _ {m n} {eq_mn : m = n} :=
-  Can2.Build 'I_m 'I_n setT setT (cast_ord eq_mn)
-    (fun _ _ => I) (fun _ _ => I)
-    (in1W (cast_ordK _)) (in1W (cast_ordKV _)).
+  Can2.Build 'I_m 'I_n (cast_ord eq_mn) (cast_ordK _) (cast_ordKV _).
 
 (** enum_val & enum_rank *)
 
 HB.instance Definition _ (T : finType) :=
-  Can2.Build T _ setT setT enum_rank (fun _ _ => I) (fun _ _ => I)
-                                    (in1W enum_rankK) (in1W enum_valK).
+  Can2.Build T _ enum_rank enum_rankK enum_valK.
 
 HB.instance Definition _ (T : finType) :=
-  Can2.Build _ T setT setT enum_val (fun _ _ => I) (fun _ _ => I)
-                                    (in1W enum_valK) (in1W enum_rankK).
+  Can2.Build _ T enum_val enum_valK enum_rankK.
 
 (** Finset val *)
 
 Definition finset_val {T : choiceType} {X : {fset T}} (x : X) : [set` X] :=
-  exist (fun x => x \in [set` X]) (val x) (mem_set (valP x)).
+  let xX : val x \in [set` X] := valP x in val x.
 Definition val_finset {T : choiceType} {X : {fset T}} (x : [set` X]) : X :=
-  [` set_mem (valP x)]%fset.
+  [` (valP x)]%fset.
 
 Lemma finset_valK {T : choiceType} {X : {fset T}} :
   cancel (@finset_val T X) val_finset.
@@ -1491,18 +1559,15 @@ Lemma val_finsetK {T : choiceType} {X : {fset T}} :
 Proof. by move=> x; apply/val_inj. Qed.
 
 HB.instance Definition _  {T : choiceType} {X : {fset T}} :=
-  Can2.Build X _ setT setT finset_val (fun _ _ => I) (fun _ _ => I)
-             (in1W finset_valK) (in1W val_finsetK).
+  Can2.Build X _ finset_val finset_valK val_finsetK.
 HB.instance Definition _  {T : choiceType} {X : {fset T}} :=
-  Can2.Build _ X setT setT val_finset (fun _ _ => I) (fun _ _ => I)
-             (in1W val_finsetK) (in1W finset_valK).
+  Can2.Build _ X val_finset val_finsetK finset_valK.
 
 (** 'I_n and `I_n *)
 
-HB.instance Definition _ n := Can2.Build _ _ setT setT (@ordII n)
-   (fun _ _ => I) (fun _ _ => I) (in1W ordIIK) (in1W IIordK).
+HB.instance Definition _ n := Can2.Build _ _ (@ordII n) ordIIK IIordK.
 HB.instance Definition _ n := SplitBij.copy (@IIord n) (ordII^-1).
-
+(*
 (**md**************************************************************************)
 (* ## Glueing                                                                 *)
 (******************************************************************************)
@@ -1599,7 +1664,7 @@ HB.instance Definition _ (f : {splitbij X >-> A}) (g : {splitbij Y >-> B}) :=
   Surject.on (gl f g).
 
 End Glue.
-
+ *)
 (** Z-module addition is a bijection *)
 
 Section addition.
@@ -1609,8 +1674,8 @@ HB.instance Definition _ := Inv.Build V V (+%R x) (+%R (- x)).
 
 Lemma inv_addr : (+%R x)^-1 = (+%R (- x)). Proof. by []. Qed.
 
-Lemma addr_can2_subproof : Inv_Can2 V V setT setT (+%R x).
-Proof. by split => // y _; rewrite inv_addr ?GRing.addKr ?GRing.addNKr. Qed.
+Lemma addr_can2_subproof : Inv_Can2 V V (+%R x).
+Proof. by split => y; rewrite inv_addr ?GRing.addKr ?GRing.addNKr. Qed.
 HB.instance Definition _ := addr_can2_subproof.
 
 End addition.
@@ -1626,8 +1691,8 @@ HB.instance Definition _ := Inv.Build V V (-%R) (-%R).
 
 Lemma inv_oppr : (-%R)^-1%FUN = (-%R). Proof. by []. Qed.
 
-Lemma oppr_can2_subproof : Inv_Can2 V V setT setT (-%R).
-Proof. by split => // y _; rewrite inv_oppr ?GRing.opprK. Qed.
+Lemma oppr_can2_subproof : Inv_Can2 V V (-%R).
+Proof. by split => // y; rewrite inv_oppr ?GRing.opprK. Qed.
 HB.instance Definition _ := oppr_can2_subproof.
 
 End addition.
@@ -1635,35 +1700,32 @@ End addition.
 (** emtpyType *)
 
 Section empty.
-Context {T : emptyType} {T' : Type} {X : set T}.
-Implicit Type Y : set T'.
+Context {T : emptyType} {T' : Type}.
 
 HB.instance Definition _ := OInv.Build _ _ (@any T T') (fun=> None).
 
-Lemma empty_can_subproof : OInv_Can T T' X any.
-Proof. by split=> x; rewrite empty_eq0 inE. Qed.
+Lemma empty_can_subproof : OInv_Can T T' any.
+Proof. by split=> /[dup] /no. Qed.
 HB.instance Definition _ := empty_can_subproof.
 
-Lemma empty_fun_subproof Y : isFun T T' X Y any.
-Proof. by split=> x; rewrite empty_eq0. Qed.
-HB.instance Definition _ Y := empty_fun_subproof Y.
-
-Lemma empty_canv_subproof : OInv_CanV T T' X set0 any. Proof. by split. Qed.
+(*TODO: incompatible parameter
+Lemma empty_canv_subproof : OInv_CanV T (@set0 T') any. Proof. by split. Qed.
 HB.instance Definition _ := empty_canv_subproof.
+ *)
 
 End empty.
 
 (**md**************************************************************************)
 (* ## Theory of surjection                                                    *)
 (******************************************************************************)
-
+(*TODO
 Section surj_lemmas.
 Variables aT rT : Type.
-Implicit Types (A : set aT) (B : set rT) (f : aT -> rT).
+Implicit Types (f : aT -> rT).
 
-Lemma surj_id A : set_surj A A (@idfun aT). Proof. exact: surj. Qed.
+Lemma surj_id : surjective (@idfun aT). Proof. exact: surj. Qed.
 
-Lemma surj_set0 B f : set_surj set0 B f -> B = set0.
+Lemma surj_set0 f : surjective (f : set0 -> _) -> rT = set0 :> set _.
 Proof. by move=> Bf; rewrite predeqE => u; split => // /Bf [t []]. Qed.
 
 Lemma surjE f A B : set_surj A B f = (B `<=` f @` A). Proof. by []. Qed.
@@ -1826,30 +1888,33 @@ Coercion fun_set_bij : set_bij >-> Funclass.
 
 Coercion set_bij_bijfun aT rT (A : set aT) (B : set rT) (f : aT -> rT)
     (fS : set_bij A B f) := Bij.on (fun_set_bij fS).
-
+ *)
 Section Pbij.
-Context {aT rT} {A : set aT} {B : set rT} {f : aT -> rT} (fbij : set_bij A B f).
-#[local] HB.instance Definition _ : @Bij _ _ A B f := fbij.
-Definition bij_of_set_bijection := [bij of f].
-Lemma Pbij : {s : {bij A >-> B} | f = s}. Proof. by exists [bij of f]. Qed.
+Context {aT rT} {f : aT -> rT} (fbij : bijective f).
+#[local] HB.instance Definition _ : CanV _ _ f := fbij.2.
+#[local] HB.instance Definition _ := SplitSurj_Inj.Build _ _ f (fbij.1).
+Definition split_of_bijective := [splitbij of f].
+Lemma Pbij : {s : {splitbij aT >-> rT} | f = s}. Proof. by exists [splitbij of f]. Qed.
 End Pbij.
-Coercion bij_of_set_bijection : set_bij >-> Bij.type.
+Coercion split_of_bijective : bijective >-> SplitBij.type.
 
-Lemma bij {aT rT} {A : set aT} {B : set rT} {f : {bij A >-> B}} : set_bij A B f.
-Proof. split=> //. Qed.
+Lemma bij {aT rT} {f : {splitbij aT >-> rT}} : bijective f.
+Proof. by split=> //; apply: surj. Qed.
+(*TODO
 Definition phant_bij aT rT (A : set aT) (B : set rT) (f : {bij A >-> B}) of
   phantom (_ -> _) f := @bij _ _ _ _ f.
 Notation "''bij_' f" := (phant_bij (Phantom (_ -> _) f)) : form_scope.
 #[global] Hint Extern 0 (set_bij _ _ _) => solve [apply: bij] : core.
-
+ *)
 Section PbijTT.
 Context {aT rT} {f : aT -> rT} (fbijTT : bijective f).
-#[local] HB.instance Definition _ := @BijTT.Build _ _ f fbijTT.
+#[local] HB.instance Definition _ :=
+  @BijTT.Build _ _ f ((split_bijectiveP _).1 fbijTT).
 Definition bijection_of_bijective := [splitbij of f].
-Lemma PbijTT : {s : {splitbij [set: aT] >-> [set: rT]} | f = s}.
+Lemma PbijTT : {s : {splitbij aT >-> rT} | f = s}.
 Proof. by exists [splitbij of f]. Qed.
 End PbijTT.
-
+(*
 Lemma setTT_bijective aT rT (f : aT -> rT) :
   set_bij [set: aT] [set: rT] f = bijective f.
 Proof.
@@ -1878,19 +1943,7 @@ Lemma patchT f : {in A, patch f =1 f}. Proof. by rewrite /patch => x ->. Qed.
 Lemma patchN f : {in [predC A], patch f =1 d}.
 Proof. by rewrite /patch => x /negPf/= ->. Qed.
 Lemma patchC f : {in ~` A, patch f =1 d}.
-Proof. by move=> u /set_mem/= NAu; rewrite patchN ?inE//= notin_setE. Qed.
-
-HB.instance Definition _ f :=
-  SurjFun.copy (patch f) [fun patch f in A].
-
-Section inj.
-Context (f : {inj A >-> rT}).
-Let g := patch f.
-Lemma patch_inj_subproof : Inj aT rT A g.
-Proof. by split=> x y xA yA; rewrite /g !patchT//; apply: inj. Qed.
-HB.instance Definition _ := patch_inj_subproof.
-HB.instance Definition _ := Inject.copy (patch f) [fun g in A].
-End inj.
+Proof. by move=> u /= NAu; rewrite [patch _ _]patchN. Qed.
 
 End patch.
 Notation restrict := (patch (fun=> point)).
@@ -1949,190 +2002,167 @@ move=> D'i D'j [x []]; rewrite /patch.
 do 2![case: ifPn => //]; rewrite !in_setE => Di Dj Fix Fjx.
 by apply: FDtriv => //; exists x.
 Qed.
-
+ *)
 (**md**************************************************************************)
 (* ## Restriction of domain and codomain                                      *)
 (******************************************************************************)
 
 Section RestrictionLeft.
-Context {U V : Type} (v : V) {A : set U} {B : set V}.
+Context {U V : Type} (v : V) {A : set U}.
 
-Local Notation restrict := (patch (fun=> v) A).
+(*Local Notation restrict := (patch (fun=> v) A).*)
 
-Definition sigL (f : U -> V) : A -> V := f \o set_val.
+Definition sigL (f : U -> V) : A -> V := f.
 
-Lemma sigL_isfun (f : {fun A >-> B}) : isFun _ _ [set: A] B (sigL f).
-Proof. by split=> x _; apply: funS. Qed.
-HB.instance Definition _ (f : {fun A >-> B}) := sigL_isfun f.
+Definition valL_ (f : A -> V) : U -> V := ((@oapp _ _)^~ v) f \o (oinv val).
 
-Definition sigLfun (f : {fun A >-> B}) := [fun of sigL f].
-Definition valL_ (f : A -> V) : U -> V := ((@oapp _ _)^~ v) f \o 'oinv_set_val.
-
-Lemma valL_isfun (f : {fun [set: A] >-> B}) :
-  isFun _ _ A B (valL_ (f : _ -> _)).
-Proof. by split=> x Ax; apply: funS. Qed.
-HB.instance Definition _ (f : {fun [set: A] >-> B}) := valL_isfun f.
-Definition valLfun_ (f : {fun [set: A] >-> B}) := [fun of valL_ f].
-
-Lemma sigLE (f : U -> V) x (xA : x \in A) :
-  sigL f (SigSub xA) = f x.
+Lemma sigLE (f : U -> V) x (xA : x \in A) : sigL f x = f x.
 Proof. done. Qed.
 
 Lemma eq_sigLP (f g : U -> V):
   {in A, f =1 g} <-> sigL f = sigL g.
 Proof.
-split=> [eq_f_g | Rfg u uA]; first by apply/funext => -[x]; apply: eq_f_g.
-by have := congr1 (@^~ (exist _ u uA)) Rfg.
+split=> [eq_f_g | + u uA]; first by apply/funext => -[x]; apply: eq_f_g.
+by move=> /(congr1 (fun f => f (u : A))).
 Qed.
 
-Lemma eq_sigLfunP (f g : {fun A >-> B}) :
-  {in A, f =1 g} <-> sigLfun f = sigLfun g.
-Proof. by rewrite eq_sigLP funP funeqP. Qed.
-
-Lemma sigLK : valL_ \o sigL = restrict.
+(*Lemma sigLK : valL_ \o sigL = restrict.
 Proof.
 rewrite funeq2E => f u; rewrite /valL_ /sigL /restrict.
 by rewrite oinv_set_val/=; case: ifPn => uA; [rewrite insubT|rewrite insubN].
-Qed.
+   Qed.*)
 
 Lemma valLK : cancel valL_ sigL.
 Proof.
-move=> f; rewrite /valL_ /sigL /restrict oinv_set_val.
-apply/funext=> a /=; have aA : set_val a \in A by apply: valP.
-by rewrite insubT//=; congr f; apply/val_inj.
+move=> f; apply/funext=> a /=.
+rewrite /valL_ /sigL /= /oinv/= default_oinvE/=.
+by case: cid => b/= /val_inj ->.
 Qed.
 
-Lemma valLfunK : cancel valLfun_ sigLfun.
-Proof. by move=> f; apply/funP/funeqP; exact: valLK. Qed.
+(*Lemma valLfunK : cancel valLfun_ sigLfun.
+   Proof. by move=> f; apply/funP/funeqP; exact: valLK. Qed.*)
 
 Lemma sigL_valL : sigL \o valL_ = id.
 Proof. exact/funext/valLK. Qed.
 
-Lemma sigL_valLfun : sigLfun \o valLfun_ = id.
+(*Lemma sigL_valLfun : sigLfun \o valLfun_ = id.
 Proof. exact/funext/valLfunK. Qed.
 
 Lemma sigL_restrict : sigL \o restrict = sigL.
 Proof.
 rewrite funeq2E => f -[u Au] /=.
 by rewrite /sigL /restrict /valL_ /patch /= Au.
-Qed.
+   Qed.*)
 
 Lemma image_sigL  : range sigL = setT.
 Proof.
-rewrite eqEsubset; split=> //= f _; exists (valL_ f)=>//.
+apply/eqP/seteqP => f; rewrite in_setT; apply/rangeP; exists (valL_ f).
 exact: valLK.
 Qed.
 
-Lemma eq_restrictP (f g : U -> V): {in A, f =1 g} <-> restrict f = restrict g.
-Proof. by rewrite eq_sigLP -sigLK/=; split => [->//|/(can_inj valLK)]. Qed.
+(*Lemma eq_restrictP (f g : U -> V): {in A, f =1 g} <-> restrict f = restrict g.
+   Proof. by rewrite eq_sigLP -sigLK/=; split => [->//|/(can_inj valLK)]. Qed.*)
 
 End RestrictionLeft.
 Arguments sigL {U V} A f u /.
 Arguments sigLE {U V} A f x.
 Arguments valL_ {U V} v {A} f u /.
 Notation "''valL_' v" := (valL_ v) : form_scope.
-Notation "''valLfun_' v" := (valLfun_ v) : form_scope.
+(*Notation "''valLfun_' v" := (valLfun_ v) : form_scope.*)
 Notation valL := (valL_ point).
 
 Section RestrictionRight.
-Context {U V : Type} {A : set V}.
+Context {U V : Type} {A : set V} (f : U -> V) (fA : range f `<=` A).
 
-Definition sigR (f : {fun [set: U] >-> A}) (u : U) : A :=
-  SigSub (mem_set ('funS_f I) : f u \in A).
-HB.instance Definition _ f := Fun.copy (sigR f) (totalfun _).
+Definition sigR (u : U) : A :=
+  let fuA : f u \in A := (elimTF subsetP fA) _ _ in f u.
 
-Definition valR (f : U -> A) := set_val \o totalfun f.
-HB.instance Definition _ f := Fun.on (valR f).
+Definition valR (f : U -> A) := val \o f.
 
-Definition valR_fun (f : U -> A) : {fun [set: U] >-> A} := [fun of valR f].
-
-Lemma sigRK (f : {fun [set: U] >-> A}) : valR (sigR f) = f.
+Lemma sigRK : valR sigR = f.
 Proof. by []. Qed.
 
-Lemma sigR_funK (f : {fun [set: U] >-> A}) : valR_fun (sigR f) = f.
-Proof. by apply/funP/funeqP; apply: sigRK. Qed.
-
-Lemma valRP (f : U -> A) x : A (valR f x). Proof. exact: set_valP. Qed.
-
-Lemma valRK : cancel valR_fun sigR.
-Proof. by move=> f; apply/funext => x; apply/val_inj. Qed.
+Lemma valRP (g : U -> A) x : valR g x \in A. Proof. exact: set_valP. Qed.
 
 End RestrictionRight.
-Arguments sigR {U V A} f u /.
+Arguments sigR {U V A} f fA u /.
 
 Section RestrictionLeftInv.
-Context {U V : Type} (v : V) {A : set U} {B : set V}.
+Context {U V : Type} (v : V) {A : set U}.
 Local Notation rl := (sigL A).
 Local Notation rr := sigR.
 Local Notation el := 'valL_v.
 Local Notation er := valR.
 
 HB.instance Definition _ (f : {oinv U >-> V}) :=
-  @OInv.Build _ _ (rl f) (obind insub \o 'oinv_f).
-HB.instance Definition _ (f : {oinvfun A >-> B}) := Fun.on (rl f).
+  @OInv.Build _ _ (rl f) (obind insub \o (oinv f)).
 
-Lemma oinv_sigL (f : {oinv U >-> V}) : 'oinv_(rl f) = obind insub \o 'oinv_f.
+Lemma oinv_sigL (f : {oinv U >-> V}) : oinv (rl f) = obind insub \o (oinv f).
 Proof. by []. Qed.
 
-Lemma sigL_inj_subproof (f : {inj A >-> V}) : @OInv_Can _ _ setT (rl f).
-Proof.
-by split=> x _; rewrite oinv_sigL/= funoK//= [insub _]'funoK_val ?inE.
-Qed.
+Lemma sigL_inj_subproof (f : {inj U >-> V}) : @OInv_Can _ _ (rl f).
+Proof. by split=> x; rewrite oinv_sigL/= funoK//= valK. Qed.
 HB.instance Definition _ f := sigL_inj_subproof f.
-HB.instance Definition _ (f : {injfun A >-> B}) := Fun.on (rl f).
 
-Lemma sigL_surj_subproof (f : {surj A >-> B}) : @OInv_CanV _ _ setT B (rl f).
+(*
+Lemma sigL_surj_subproof (f : {surj U >-> V}) : @OInv_CanV _ _ (rl f).
 Proof.
-split=> [b|b /set_mem] Bb; rewrite ?oinv_sigL/=.
-   have [x /mem_set Ax <-]/= := 'oinvS_f Bb; exists (SigSub Ax) => //=.
-   case: insubP => [a Aa/= eqx|]; last by rewrite Ax.
+split=> y; rewrite ?oinv_sigL/=.
+   case: (oinv f y) (@oinvS _ _ f y) => // x _/=.
+   case: insubP => [a/= eqx|]; last first. by rewrite eqx.
    by congr Some; apply/val_inj.
 by rewrite /rl/= oapp_comp/= -oinv_val -inv_omap/= invK ?oinvK ?mem_fun ?inE.
 Qed.
 HB.instance Definition _ f := sigL_surj_subproof f.
 HB.instance Definition _ (f : {surjfun A >-> B}) := Fun.on (rl f).
 HB.instance Definition _ (f : {bij A >-> B}) := Fun.on (rl f).
+ *)
 
-HB.instance Definition _ (f : {oinvfun [set: V] >-> A}) :=
-  @OInv.Build _ _ (rr f) (rl 'oinv_f).
+HB.instance Definition _ (f : {oinv V >-> U}) (fA : range f `<=` A) :=
+  @OInv.Build _ _ (rr _ fA) (oinv f \o val).
 
-Lemma oinv_sigR (f : {oinvfun [set: V] >-> A}) :
-  'oinv_(rr f) = (rl 'oinv_f).
+Lemma oinv_sigR (f : {oinv V >-> U}) (fA : range f `<=` A) :
+  oinv (rr _ fA) = oinv f \o val.
 Proof. by []. Qed.
 
-Lemma sigR_inj_subproof (f : {injfun [set: V] >-> A}) :
-   @OInv_Can _ _ setT (rr f).
-Proof. by split=> x _; rewrite oinv_sigR/= set_valE/= funoK ?inE. Qed.
-HB.instance Definition _ f := sigR_inj_subproof f.
+Lemma sigR_inj_subproof (f : {inj V >-> U}) (fA : range f `<=` A) :
+   @OInv_Can _ _ (rr _ fA).
+Proof. by split=> x; rewrite oinv_sigR/= funoK. Qed.
+HB.instance Definition _ (f : {inj V >-> U}) (fA : range f `<=` A) :=
+  sigR_inj_subproof fA.
 
-Lemma sigR_surj_subproof (f : {surjfun [set: V] >-> A}) :
-  @OInv_CanV _ _ setT setT (rr f).
+Lemma sigR_surj_subproof (f : {surj V >-> U}) (fA : range f `<=` A) :
+  @OInv_CanV _ _ (rr _ fA).
 Proof.
-split=> a _; rewrite ?oinv_sigL/=.
-  by have [x _ xeq] := 'oinvS_f (set_valP a); exists x.
-apply/val_inj=> /=; rewrite oinv_sigR/=.
-by case: oinvP=> //=; apply: set_valP.
+split=> a; rewrite ?oinv_sigR/=; first exact: oinvS.
+by apply: val_inj; case: oinvP.
 Qed.
-HB.instance Definition _ f := sigR_surj_subproof f.
+HB.instance Definition _ (f : {surj V >-> U}) (fA : range f `<=` A) :=
+  sigR_surj_subproof fA.
 
-Lemma sigR_some_inv (f : {invfun [set: V] >-> A}) :
-  olift (rl f^-1) = 'oinv_(rr f).
+Lemma sigR_some_inv (f : {inv V >-> U}) (fA : range f `<=` A) :
+  olift (rl f^-1) = oinv (rr _ fA).
 Proof. by rewrite oinv_sigR olift_comp oliftV. Qed.
-HB.instance Definition _ (f : {bij [set: V] >-> A}) := Fun.on (rr f).
 
-HB.instance Definition _ (f : {invfun [set: V] >-> A}) :=
-   @OInv_Inv.Build _ _ (rr f) (rl f^-1) (sigR_some_inv f).
+HB.instance Definition _ (f : {inv V >-> U}) (fA : range f `<=` A) :=
+   @OInv_Inv.Build _ _ (rr _ fA) (rl f^-1) (sigR_some_inv fA).
 
-Lemma inv_sigR (f : {invfun [set: V] >-> A}) : (rr f)^-1 = (rl f^-1).
+Lemma inv_sigR (f : {inv V >-> U}) (fA : range f `<=` A) :
+  (rr _ fA)^-1 = (rl f^-1).
 Proof. by []. Qed.
 
-HB.instance Definition _ (f : {splitinjfun [set: V] >-> A}) := Inject.on (rr f).
+HB.instance Definition _ (f : {splitinj V >-> U}) (fA : range f `<=` A) :=
+  Inject.on (rr _ fA).
 (* HB Bug, if Fun.on instead of Surject.on *)
-HB.instance Definition _ (f : {splitsurjfun [set: V] >-> A}) := Surject.on (rr f).
-HB.instance Definition _ (f : {splitbij [set: V] >-> A}) := Fun.on (rr f).
+HB.instance Definition _ (f : {splitsurj V >-> U}) (fA : range f `<=` A) :=
+  Surject.on (rr _ fA).
+HB.instance Definition _ (f : {splitbij V >-> U}) (fA : range f `<=` A) :=
+  Inject.on (rr _ fA).
+End RestrictionLeftInv.
 
-Lemma sigL_some_inv (f : {splitbij A >-> [set: V]}) :
-  olift (rr [fun of f^-1]) = 'oinv_(rl f).
+(*
+Lemma sigL_some_inv (f : {splitbij U >-> V}) :
+  olift (rr _ (surj f^-1)) = oinv (rl f).
 Proof.
 apply/funext=> x /=; rewrite oinv_sigL /= /sigR/= /olift/=.
 case: oinvP => //= u Au _; rewrite insubT ?inE// => memAu.
@@ -2401,24 +2431,30 @@ Lemma splitbij_sub_sym {aT rT} {A C : set aT} {B D : set rT}
     (f : {splitbij A >-> B}) : C `<=` A -> D `<=` B ->
   set_bij D C f^-1 <-> set_bij C D f.
 Proof. by move=> CA DB; rewrite -bij_sub_sym// -oliftV bij_olift. Qed.
-
+*)
 Section set_bij_lemmas.
 Context {aT rT : Type}.
-Implicit Types (A : set aT) (B : set rT) (f : aT -> rT).
+Implicit Types (f : aT -> rT).
 
-Lemma set_bij00 T U (f : T -> U) : set_bij set0 set0 f.
-Proof. by split=> [_ []//|x y|//]; rewrite inE. Qed.
-Hint Resolve set_bij00 : core.
+Lemma bijective00 (T U : emptyType) (f : T -> U) : bijective f.
+Proof. by split=> [/[dup]/no//|]; apply/subsetP => /[dup]/no. Qed.
+Hint Resolve bijective00 : core.
 
-Lemma inj_bij A f : {in A &, injective f} -> set_bij A (f @` A) f.
-Proof. by move=> /Pinj[{}f->]; apply: 'bij_[fun f in A]. Qed.
+Lemma inj_bij f : injective f -> bijective (f : _ -> range f).
+Proof.
+move=> finj; split=> [x y /(congr1 val)/finj//|].
+apply/subsetP; case=> _ /[dup] /rangeP[] x <- fx _.
+by apply/rangeP; exists x; apply: val_inj.
+Qed.
 
+(*
 Lemma bij_subl A B C D (f : {bij A >-> B}) : C `<=` A -> f @` C = D ->
   set_bij C D f.
 Proof. by move=> /homo_setP CA <-; split=> // x y /CA + /CA +; apply: inj. Qed.
+ *)
 
 End set_bij_lemmas.
-
+(*
 Section set_bij_lemmas.
 Context {aT rT : Type}.
 Implicit Types (A : set aT) (B : set rT) (f : aT -> rT).
@@ -2585,7 +2621,7 @@ Notation "''injpPfun_' dflt" := (injpPfun_ dflt) : form_scope.
 Notation injpPfun := 'injpPfun_(fun=> point).
 Notation "''funpPinj_' dflt" := (funpPinj_ dflt) : form_scope.
 Notation funpPinj := 'funpPinj_(fun=> point).
-
+ *)
 Section function_space.
 Local Open Scope ring_scope.
 Import GRing.Theory.
@@ -2595,8 +2631,8 @@ Definition cst {T T' : Type} (x : T') : T -> T' := fun=> x.
 Lemma preimage_cst {aT rT : Type} (a : aT) (A : set aT) :
   @cst rT _ a @^-1` A = if a \in A then setT else set0.
 Proof.
-apply/seteqP; rewrite /preimage; split; first by move=> *; rewrite mem_set.
-by case: ifPn => [/[!inE] ?//|_]; exact: sub0set.
+apply/eqP/seteqP => b; rewrite in_preimage /cst/= 2!fun_if in_setT in_set0.
+by case: ifP.
 Qed.
 
 Obligation Tactic := idtac.
