@@ -1825,19 +1825,13 @@ Lemma preimage_bigcap {I} f (F : I -> set rT) :
   f @^-1` (\bigcap_i F i) = \bigcap_i (f @^-1` F i).
 Proof. exact/eqP/seteqP. Qed.
 
-Lemma eq_preimage {I T : Type} (D : set I) (A : set T) (F G : I -> T) :
-  {in D, F =1 G} -> D `&` F @^-1` A = D `&` G @^-1` A.
-Proof.
-move=> eqFG; apply/eqP/seteqP => i; rewrite !in_setI; apply: andb_id2l => iD.
-by rewrite !in_preimage eqFG.
-Qed.
+Lemma eq_preimage {I T : Type} (A : set T) (F G : I -> T) :
+  F =1 G -> F @^-1` A = G @^-1` A.
+Proof. by move=> eqFG; apply/eqP/seteqP => i; rewrite in_preimage eqFG. Qed.
 
-Lemma notin_setI_preimage T (R : eqType) (D : set T) (f : T -> R) i :
-  i \notin f @` D -> D `&` f @^-1` [set i] = set0.
-Proof.
-move=> /negP iD; apply/eqP/seteqP => x; rewrite in_set0.
-by apply/negP => /andP[] xD /eqP xi; apply/iD/imageP; exists x.
-Qed.
+Lemma notin_setI_preimage T (R : eqType) (f : T -> R) i :
+  i \notin range f -> f @^-1` [set i] = set0.
+Proof. by move=> ir; apply/eqP/seteqP => x; apply: contraNF ir => /eqP <-. Qed.
 
 Lemma comp_preimage T1 T2 T3 (A : set T3) (g : T1 -> T2) (f : T2 -> T3) :
   (f \o g) @^-1` A = g @^-1` (f @^-1` A).
@@ -1846,8 +1840,8 @@ Proof. by []. Qed.
 Lemma preimage_id T (A : set T) : id @^-1` A = A.
 Proof. by apply/eqP/seteqP. Qed.
 
-Lemma preimage_comp T1 T2 (g : T1 -> rT) (f : T2 -> rT) (C : set T1) :
-  f @^-1` [set g x | x in C] = [set x | f x \in g @` C].
+Lemma preimage_comp T1 T2 (g : T1 -> rT) (f : T2 -> rT) :
+  f @^-1` range g = [set x | f x \in range g].
 Proof. by []. Qed.
 
 (* TOTHINK: Wat? *)
@@ -2863,6 +2857,7 @@ HB.instance Definition _ m n (T : pointedType) :=
   isPointed.Build 'M[T]_(m, n) (\matrix_(_, _) point)%R.
 HB.instance Definition _ (T : choiceType) := isPointed.Build (option T) None.
 HB.instance Definition _ (T : choiceType) := isPointed.Build {fset T} fset0.
+HB.instance Definition _ (T : choiceType) := isPointed.Build (set T) set0.
 
 Notation get := (xget point).
 Notation "[ 'get' x | E ]" := (get [set x | E])

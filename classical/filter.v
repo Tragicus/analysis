@@ -3,7 +3,8 @@ From HB Require Import structures.
 From mathcomp Require Import all_ssreflect all_algebra finmap generic_quotient.
 From mathcomp Require Import archimedean.
 From mathcomp Require Import boolp classical_sets functions wochoice.
-From mathcomp Require Import cardinality mathcomp_extra fsbigop set_interval.
+From mathcomp Require Import cardinality mathcomp_extra.
+(*From mathcomp Require Import fsbigop set_interval. *)
 
 (**md**************************************************************************)
 (* # Filters                                                                  *)
@@ -224,7 +225,7 @@ HB.mixin Record isFiltered U T := {
 
 #[short(type="filteredType")]
 HB.structure Definition Filtered (U : Type) := {T of Choice T & isFiltered U T}.
-Arguments nbhs {_ _} _ _ : simpl never.
+Arguments nbhs {_ _} _ : simpl never.
 
 #[short(type="pfilteredType")]
 HB.structure Definition PointedFiltered (U : Type) := {T of Pointed T & isFiltered U T}.
@@ -248,35 +249,36 @@ HB.structure Definition Nbhs := {T of Choice T & hasNbhs T}.
 #[short(type="pnbhsType")]
 HB.structure Definition PointedNbhs := {T of Pointed T & hasNbhs T}.
 
-Definition filter_from {I T : Type} (D : set I) (B : I -> set T) :
-  set_system T := [set P | exists2 i, D i & B i `<=` P].
+Definition filter_from {I T : Type} (B : I -> set T) :
+  set_system T := \bigcup_i [set P | B i `<=` P].
 
 (* the canonical filter on matrices on X is the product of the canonical filter
    on X *)
 HB.instance Definition _ m n X (Z : filteredType X) :=
   isFiltered.Build 'M[X]_(m, n) 'M[Z]_(m, n) (fun mx => filter_from
-    [set P | forall i j, nbhs (mx i j) (P i j)]
-    (fun P => [set my : 'M[X]_(m, n) | forall i j, P i j (my i j)])).
+    (fun P : \bigcap_i \bigcap_j [set P | P i j \in nbhs (mx i j)] =>
+        \bigcap_i \bigcap_j [set my : 'M[X]_(m, n) | my i j \in P i j])).
 
 HB.instance Definition _ m n (X : nbhsType) := selfFiltered.Build 'M[X]_(m, n).
 
 Definition filter_prod {T U : Type}
   (F : set_system T) (G : set_system U) : set_system (T * U) :=
-  filter_from (fun P => F P.1 /\ G P.2) (fun P => P.1 `*` P.2).
+  filter_from (fun P : F `*` G => P.1 `*` P.2).
 
 Section Near.
 
-Local Notation "{ 'all1' P }" := (forall x, P x : Prop) (at level 0).
-Local Notation "{ 'all2' P }" := (forall x y, P x y : Prop) (at level 0).
-Local Notation "{ 'all3' P }" := (forall x y z, P x y z: Prop) (at level 0).
+Local Notation "{ 'all1' P }" := (forall x, P x : bool) (at level 0).
+Local Notation "{ 'all2' P }" := (forall x y, P x y : bool) (at level 0).
+Local Notation "{ 'all3' P }" := (forall x y z, P x y z : bool) (at level 0).
 Local Notation ph := (phantom _).
 
+(* TOTHINK: Is this the correct abstraction? *)
 Definition prop_near1 {X} {fX : filteredType X} (x : fX)
-   P (phP : ph {all1 P}) := nbhs x P.
+   P (phP : ph {all1 P}) := [set x | P x] \in nbhs x.
 
 Definition prop_near2 {X X'} {fX : filteredType X} {fX' : filteredType X'}
   (x : fX) (x' : fX') := fun P of ph {all2 P} =>
-  filter_prod (nbhs x) (nbhs x') (fun x => P x.1 x.2).
+  [set x | P x.1 x.2] \in filter_prod (nbhs x) (nbhs x').
 
 End Near.
 
@@ -293,14 +295,14 @@ Notation "'\near' x & y , P" := (\forall x \near x & y \near y, P) : type_scope.
 Arguments prop_near1 : simpl never.
 Arguments prop_near2 : simpl never.
 
-Lemma nearE {T} {F : set_system T} (P : set T) :
-  (\forall x \near F, P x) = F P.
+Lemma nearE {T} {F : set_system T} (P : {pred T}) :
+  (\forall x \near F, P x) = ([set x | P x] \in F).
 Proof. by []. Qed.
 
-Lemma eq_near {T} {F : set_system T} (P Q : set T) :
-  (forall x, P x <-> Q x) ->
+Lemma eq_near {T} {F : set_system T} (P Q : {pred T}) :
+  P =1 Q ->
   (\forall x \near F, P x) = (\forall x \near F, Q x).
-Proof. by move=> /predeqP ->. Qed.
+Proof. by move=> /funext ->. Qed.
 
 Lemma nbhs_filterE {T : Type} (F : set_system T) : nbhs F = F.
 Proof. by []. Qed.
@@ -312,26 +314,26 @@ End NbhsFilter.
 Definition cvg_to {T : Type} (F G : set_system T) := G `<=` F.
 Notation "F `=>` G" := (cvg_to F G) : classical_set_scope.
 
-Lemma cvg_refl T (F : set_system T) : F `=>` F. Proof. exact. Qed.
+Lemma cvg_refl T (F : set_system T) : F `=>` F. Proof. exact: subset_refl. Qed.
 Arguments cvg_refl {T F}.
 #[global] Hint Resolve cvg_refl : core.
 
 Lemma cvg_trans T (G F H : set_system T) :
   (F `=>` G) -> (G `=>` H) -> (F `=>` H).
-Proof. by move=> FG GH P /GH /FG. Qed.
+Proof. move=> /[swap] /subset_trans; apply. Qed.
 
 Notation "F --> G" := (cvg_to (nbhs F) (nbhs G)) : classical_set_scope.
 Definition type_of_filter {T} (F : set_system T) := T.
 
 Definition lim_in {U : Type} (T : pfilteredType U) :=
-  fun F : set_system U => get (fun l : T => F --> l).
+  fun F : set_system U => get [set l : T | F --> l].
 Notation "[ 'lim' F 'in' T ]" := (@lim_in _ T (nbhs F)) : classical_set_scope.
 Definition lim {T : pnbhsType} (F : set_system T) := [lim F in T].
 Notation "[ 'cvg' F 'in' T ]" := (F --> [lim F in T]) : classical_set_scope.
 Notation cvg F := (F --> lim F).
 
 (* :TODO: ultimately nat could be replaced by any lattice *)
-Definition eventually := filter_from setT (fun N => [set n | (N <= n)%N]).
+Definition eventually := filter_from (fun N => [set n | (N <= n)%N]).
 Notation "'\oo'" := eventually : classical_set_scope.
 
 Section FilteredTheory.
@@ -346,13 +348,14 @@ HB.instance Definition _ (X1 X2 : nbhsType)  :=
 Lemma cvg_prod T {U U' V V' : filteredType T} (x : U) (l : U') (y : V) (k : V') :
   x --> l -> y --> k -> (x, y) --> (l, k).
 Proof.
-move=> xl yk X [[X1 X2] /= [HX1 HX2] H]; exists (X1, X2) => //=.
-split; [exact: xl | exact: yk].
+move=> /subsetP xl /subsetP yk; apply/subsetP => X.
+move=> /in_bigcupP[]/= [][]/= X1 X2 /andP[]/= /xl X1x /yk X2y X12.
+by apply/in_bigcupP => /=; exists (X1, X2).
 Qed.
 
 Lemma cvg_in_ex {U : Type} (T : pfilteredType U) (F : set_system U) :
   [cvg F in T] <-> (exists l : T, F --> l).
-Proof. by split=> [cvg|/getPex//]; exists [lim F in T]. Qed.
+Proof. by split=> [cvg|/(getP [set l : T | F --> l])//]; exists [lim F in T]. Qed.
 
 Lemma cvg_ex (T : pnbhsType) (F : set_system T) :
   cvg F <-> (exists l : T, F --> l).
@@ -375,7 +378,11 @@ Proof. exact: cvg_in_toP. Qed.
 
 Lemma dvg_inP {U : Type} (T : pfilteredType U) (F : set_system U) :
   ~ [cvg F in T] -> [lim F in T] = point.
-Proof. by rewrite /lim_in /=; case xgetP. Qed.
+Proof.
+rewrite /lim_in /= => F0; move: (@get0 T); congr (get _ = _).
+apply/esym/eqP/seteqP => x; rewrite in_set0; apply/negP.
+by apply: contra_not F0 => /(@ex_intro _ (fun x => x \in _) x)/getP.
+Qed.
 
 Lemma dvgP (T : pnbhsType) (F : set_system T) : ~ cvg F -> lim F = point.
 Proof. exact: dvg_inP. Qed.
@@ -394,26 +401,26 @@ Arguments cvgP {T F} l.
 Arguments dvgP {T F}.
 
 Lemma nbhs_nearE {U} {T : filteredType U} (x : T) (P : set U) :
-  nbhs x P = \near x, P x.
-Proof. by []. Qed.
+  P \in nbhs x = \near x, x \in P.
+Proof. by congr in_mem; apply/eqP/seteqP. Qed.
 
-Lemma near_nbhs {U} {T : filteredType U} (x : T) (P : set U) :
+Lemma near_nbhs {U} {T : filteredType U} (x : T) (P : {pred U}) :
   (\forall x \near nbhs x, P x) = \near x, P x.
 Proof. by []. Qed.
 
-Lemma near2_curry {U V} (F : set_system U) (G : set_system V) (P : U -> set V) :
+Lemma near2_curry {U V} (F : set_system U) (G : set_system V) (P : U -> {pred V}) :
   {near F & G, forall x y, P x y} = {near (F, G), forall x, P x.1 x.2}.
 Proof. by []. Qed.
 
-Lemma near2_pair {U V} (F : set_system U) (G : set_system V) (P : set (U * V)) :
+Lemma near2_pair {U V} (F : set_system U) (G : set_system V) (P : {pred (U * V)}) :
   {near F & G, forall x y, P (x, y)} = {near (F, G), forall x, P x}.
-Proof. by symmetry; congr (nbhs _); rewrite predeqE => -[]. Qed.
+Proof. by symmetry; congr in_mem; apply/eqP/seteqP => -[]. Qed.
 
 Definition near2E := (@near2_curry, @near2_pair).
 
 Lemma filter_of_nearI (X : Type) (fX : filteredType X)
   (x : fX) : forall P,
-  nbhs x P = @prop_near1 X fX x P (inPhantom (forall x, P x)).
+  [set x | P x] \in nbhs x = @prop_near1 X fX x P (inPhantom (forall x, P x)).
 Proof. by []. Qed.
 
 Module Export NearNbhs.
@@ -421,24 +428,25 @@ Definition near_simpl := (@near_nbhs, @nbhs_nearE, filter_of_nearI).
 Ltac near_simpl := rewrite ?near_simpl.
 End NearNbhs.
 
-Lemma near_swap {U V} (F : set_system U) (G : set_system V) (P : U -> set V) :
+Lemma near_swap {U V} (F : set_system U) (G : set_system V) (P : U -> {pred V}) :
   (\forall x \near F & y \near G, P x y) = (\forall y \near G & x \near F, P x y).
 Proof.
-rewrite propeqE; split => -[[/=A B] [FA FB] ABP];
-by exists (B, A) => // -[x y] [/=Bx Ay]; apply: (ABP (y, x)).
+apply/in_bigcupP/in_bigcupP => -[][][]/= A B /andP[]/= FA GB /subsetP ABP;
+  exists (B, A) => /=; apply/subsetP => -[] x y /andP[]/= xB yA;
+  apply: (ABP (y, x)).
 Qed.
 
 (** Filters *)
 
 Class Filter {T : Type} (F : set_system T) := {
-  filterT : F setT ;
-  filterI : forall P Q : set T, F P -> F Q -> F (P `&` Q) ;
-  filterS : forall P Q : set T, P `<=` Q -> F P -> F Q
+  filterT : setT \in F ;
+  filterI : forall P Q : F, (P `&` Q) \in F ;
+  filterS : forall P Q : set T, P `<=` Q -> P \in F -> Q \in F
 }.
 Global Hint Mode Filter - ! : typeclass_instances.
 
 Class ProperFilter {T : Type} (F : set_system T) := {
-  filter_not_empty : ~ F set0 ;
+  filter_not_empty : set0 \notin F ;
   filter_filter : Filter F
 }.
 (* TODO: Reuse :> above and remove the following line and the coercion below
@@ -446,17 +454,10 @@ Class ProperFilter {T : Type} (F : set_system T) := {
 Global Existing Instance filter_filter.
 Global Hint Mode ProperFilter - ! : typeclass_instances.
 Arguments filter_not_empty {T} F {_}.
-Hint Extern 0 (~ _ set0) => solve [apply: filter_not_empty] : core.
+Hint Extern 0 (~ _ set0) => solve [apply/negP/filter_not_empty] : core.
 
 Lemma filter_setT (T : Type) : Filter [set: set T].
 Proof. by constructor. Qed.
-
-Lemma filterP_strong T (F : set_system T) {FF : Filter F} (P : set T) :
-  (exists Q : set T, exists FQ  : F Q, forall x : T, Q x -> P x) <-> F P.
-Proof.
-split; last by exists P.
-by move=> [Q [FQ QP]]; apply: (filterS QP).
-Qed.
 
 Structure filter_on T := FilterType {
   filter :> set_system T;
@@ -470,7 +471,7 @@ Arguments FilterType {T} _ _.
 Coercion filter_filter : ProperFilter >-> Filter.
 
 Structure pfilter_on T := PFilterPack {
-  pfilter :> (T -> Prop) -> Prop;
+  pfilter :> set (set T);
   _ : ProperFilter pfilter
 }.
 Definition pfilter_class T (F : pfilter_on T) : ProperFilter F :=
@@ -481,8 +482,8 @@ Arguments PFilterPack {T} _ _.
 Canonical pfilter_filter_on T (F : pfilter_on T) :=
   FilterType F (pfilter_class F).
 Coercion pfilter_filter_on : pfilter_on >-> filter_on.
-Definition PFilterType {T} (F : (T -> Prop) -> Prop)
-  {fF : Filter F} (fN0 : not (F set0)) :=
+Definition PFilterType {T} (F : set (set T))
+  {fF : Filter F} (fN0 : set0 \notin F) :=
   PFilterPack F (Build_ProperFilter fN0 fF).
 Arguments PFilterType {T} F {fF} fN0.
 
@@ -501,112 +502,119 @@ Lemma nbhs_filter_onE T (F : filter_on T) : nbhs F = nbhs (filter F).
 Proof. by []. Qed.
 Definition nbhs_simpl := (@nbhs_simpl, @nbhs_filter_onE).
 
-Lemma near_filter_onE T (F : filter_on T) (P : set T) :
+Lemma near_filter_onE T (F : filter_on T) (P : {pred T}) :
   (\forall x \near F, P x) = \forall x \near filter F, P x.
 Proof. by []. Qed.
 Definition near_simpl := (@near_simpl, @near_filter_onE).
 
 Program Definition trivial_filter_on T := FilterType [set setT : set T] _.
 Next Obligation.
-split=> // [_ _ -> ->|Q R sQR QT]; first by rewrite setIT.
-by move; rewrite eqEsubset; split => // ? _; apply/sQR; rewrite QT.
+split=> // [[] _/= /eqP -> [] _/= /eqP ->|Q R /[swap]/eqP ->].
+  by rewrite setIT.
+by rewrite subTset.
 Qed.
 Canonical trivial_filter_on.
 
 Lemma filter_nbhsT {T : Type} (F : set_system T) :
-   Filter F -> nbhs F setT.
+   Filter F -> setT \in nbhs F.
 Proof. by move=> FF; apply: filterT. Qed.
 #[global] Hint Resolve filter_nbhsT : core.
 
-Lemma nearT {T : Type} (F : set_system T) : Filter F -> \near F, True.
+Lemma nearT {T : Type} (F : set_system T) : Filter F -> \near F, true.
 Proof. by move=> FF; apply: filterT. Qed.
 #[global] Hint Resolve nearT : core.
 
 Lemma filter_not_empty_ex {T : Type} (F : set_system T) :
-  (forall P, F P -> exists x, P x) -> ~ F set0.
-Proof. by move=> /(_ set0) ex /ex []. Qed.
+  (forall P : F, P !=set0) -> set0 \notin F.
+Proof. by move=> ex; apply/negP => F0; case: (ex set0). Qed.
 
 Definition Build_ProperFilter_ex {T : Type} (F : set_system T)
-  (filter_ex : forall P, F P -> exists x, P x)
+  (filter_ex : forall P : F, P !=set0)
   (FF : Filter F) :=
   Build_ProperFilter (filter_not_empty_ex filter_ex) FF.
 
 Lemma filter_ex_subproof {T : Type} (F : set_system T) :
-  ~ F set0 -> (forall P, F P -> exists x, P x).
+  set0 \notin F -> forall P : F, P !=set0.
 Proof.
-move=> NFset0 P FP; apply: contra_notP NFset0 => nex; suff <- : P = set0 by [].
-by rewrite funeqE => x; rewrite propeqE; split=> // Px; apply: nex; exists x.
+by move=> + P; apply: contraNP => /(negPP (set0P _)); rewrite negbK => /eqP <-.
 Qed.
 
 Definition filter_ex {T : Type} (F : set_system T) {FF : ProperFilter F} :=
   filter_ex_subproof (filter_not_empty F).
-Arguments filter_ex {T F FF _}.
+Arguments filter_ex {T F FF}.
 
 Lemma filter_getP {T : pointedType} (F : set_system T) {FF : ProperFilter F}
-  (P : set T) : F P -> P (get P).
-Proof. by move=> /filter_ex /getPex. Qed.
+  (P : F) : get P \in P.
+Proof. exact/getP/filter_ex. Qed.
 
 (* Near Tactic *)
 
-Record in_filter T (F : set_system T) := InFilter {
-  prop_in_filter_proj : T -> Prop;
-  prop_in_filterP_proj : F prop_in_filter_proj
-}.
 (* add ball x e as a canonical instance of nbhs x *)
 
-Module Type PropInFilterSig.
-Axiom t : forall (T : Type) (F : set_system T), in_filter F -> T -> Prop.
-Axiom tE : t = prop_in_filter_proj.
-End PropInFilterSig.
-Module PropInFilter : PropInFilterSig.
-Definition t := prop_in_filter_proj.
-Lemma tE : t = prop_in_filter_proj. Proof. by []. Qed.
-End PropInFilter.
-(* Coercion PropInFilter.t : in_filter >-> Funclass. *)
-Notation prop_of := PropInFilter.t.
-Definition prop_ofE := PropInFilter.tE.
-Notation "x \is_near F" := (@PropInFilter.t _ F _ x).
-Definition is_nearE := prop_ofE.
+Notation "x \is_near F" := (x \in (@MemType.elt (set _) F _)).
+Notation is_nearE := erefl.
 
-Lemma prop_ofP T F (iF : @in_filter T F) : F (prop_of iF).
-Proof. by rewrite prop_ofE; apply: prop_in_filterP_proj. Qed.
+(* TODO: remove? *)
+Lemma prop_ofP T (F : set_system T) (iF : F) : (val iF) \in F.
+Proof. exact: valP. Qed.
 
-Definition in_filterT T F (FF : Filter F) : @in_filter T F :=
-  InFilter (filterT).
-Canonical in_filterI T F (FF : Filter F) (P Q : @in_filter T F) :=
-  InFilter (filterI (prop_in_filterP_proj P) (prop_in_filterP_proj Q)).
+Elpi Accumulate TC.Solver lp:{{
+:after "1"
+tc-Corelib.Init.Datatypes.tc-is_true {{ @in_mem lp:T (@setT lp:T') (@ssrbool.mem lp:T (@set_predType lp:T) lp:S) }} R :-
+  coq.unify-eq T {{ @set lp:T' }} ok,
+  coq.typecheck SF {{ @Filter lp:T' lp:S }} ok,
+  coq.ltac.collect-goals SF [G] _,
+  coq.ltac.open (coq.ltac.call-ltac1 "done_tc") G [],
+  R = {{ @filterT lp:T' lp:S lp:SF }}.
+}}.
+Definition in_filterT T F (FF : Filter F) : F := [set: T].
 
-Lemma filter_near_of T F (P : @in_filter T F) (Q : set T) : Filter F ->
-  (forall x, prop_of P x -> Q x) -> F Q.
-Proof.
-by move: P => [P FP] FF /=; rewrite prop_ofE /= => /filterS; apply.
-Qed.
+Elpi Accumulate TC.Solver lp:{{
+:after "1"
+tc-Corelib.Init.Datatypes.tc-is_true {{ @in_mem lp:T (@setI lp:T' lp:X1 lp:X2) (@ssrbool.mem lp:T (@set_predType lp:T) lp:S) }} R :-
+  coq.unify-eq T {{ @set lp:T' }} ok,
+  coq.unify-eq X1 {{ lp:X1'.(MemType.elt) }} ok,
+  coq.unify-eq X2 {{ lp:X2'.(MemType.elt) }} ok,
+  coq.typecheck SF {{ @Filter lp:T' lp:S }} ok,
+  coq.ltac.collect-goals (app [SF, X1, X2]) Gs _,
+  coq.ltac.all (coq.ltac.open (coq.ltac.call-ltac1 "done_tc")) Gs [],
+  R = {{ @filterI lp:T' lp:S lp:SF lp:X1' lp:X2' }}.
+}}.
+
+Definition in_filterI T (F : set_system T) (FF : Filter F) (P Q : F) : F := P `&` Q.
+
+(* TODO: I might need something closer to `forall x, prop_of P x -> Q x` *)
+Lemma filter_near_of T (F : set_system T) (P : F) (Q : set T) : Filter F ->
+  (P `<=` Q) -> Q \in F.
+Proof. by move=> FF /filterS. Qed.
 
 Fact near_key : unit. Proof. exact. Qed.
 
-Lemma mark_near (P : Prop) : locked_with near_key P -> P.
-Proof. by rewrite unlock. Qed.
+Definition locked_near (k : unit) T (F : set_system T) (P : Prop) :=
+  match k with
+  | tt => P
+  end.
 
-Lemma near_acc T F (P : @in_filter T F) (Q : set T) (FF : Filter F)
+Lemma mark_near (P : Prop) T (F : set_system T) : locked_near near_key F P -> P.
+Proof. by case: near_key. Qed.
+
+Lemma near_acc T (F : set_system T) (P : F) (Q : {pred T}) (FF : Filter F)
    (FQ : \forall x \near F, Q x) :
-   locked_with near_key (forall x, prop_of (in_filterI FF P (InFilter FQ)) x -> Q x).
-Proof. by rewrite unlock => x /=; rewrite !prop_ofE /= => -[Px]. Qed.
+   locked_near near_key F (forall x, x \in in_filterI FF P (MemType.Pack FQ) -> Q x).
+Proof. by case: near_key => x /= /andP[]. Qed.
 
-Lemma near_skip_subproof T F (P Q : @in_filter T F) (G : set T) (FF : Filter F) :
-   locked_with near_key (forall x, prop_of P x -> G x) ->
-   locked_with near_key (forall x, prop_of (in_filterI FF P Q) x -> G x).
-Proof.
-rewrite !unlock => FG x /=; rewrite !prop_ofE /= => -[Px Qx].
-by have /= := FG x; apply; rewrite prop_ofE.
-Qed.
+Lemma near_skip_subproof T (F : set_system T) (P Q : F) (G : {pred T}) (FF : Filter F) :
+  locked_near near_key F (forall x, x \in P -> G x) ->
+  locked_near near_key F (forall x, x \in P `&` Q -> G x).
+Proof. by case: near_key => FG x /andP[] /FG. Qed.
 
-Tactic Notation "near=>" ident(x) := apply: filter_near_of => x ?.
+Tactic Notation "near=>" ident(x) := apply: filter_near_of; apply/subsetP => x ?.
 
 Ltac just_discharge_near x :=
-  tryif match goal with Hx : x \is_near _ |- _ => move: (x) (Hx); apply: mark_near end
+  tryif match goal with Hx : is_true (x \is_near ?F) |- _ => move: (x) (Hx); apply: (@mark_near _ _ F) end
         then idtac else fail "the variable" x "is not a ""near"" variable".
 Ltac near_skip :=
-  match goal with |- locked_with near_key (forall _, @PropInFilter.t _ _ ?P _ -> _) =>
+  match goal with |- locked_near near_key _ (forall _, is_true (_ \in ?P) -> _) =>
     tryif is_evar P then fail "nothing to skip" else apply: near_skip_subproof end.
 
 Tactic Notation "near:" ident(x) :=
@@ -629,67 +637,85 @@ Ltac done :=
    [ do ![solve [trivial | apply: sym_equal; trivial]
          | discriminate | contradiction | split]
    | match goal with H : ~ _ |- _ => solve [case H; trivial] end
-   | match goal with |- ?x \is_near _ => near: x; apply: prop_ofP end ].
+   | match goal with |- is_true (?x \is_near _) => near: x; apply: prop_ofP end ].
 
-Lemma have_near (U : Type) (fT : filteredType U) (x : fT) (P : Prop) :
+Lemma have_near (U : Type) (fT : filteredType U) (x : fT) (P : bool) :
   ProperFilter (nbhs x) -> (\forall x \near x, P) -> P.
-Proof. by move=> FF nP; have [] := @filter_ex _ _ FF (fun=> P). Qed.
+Proof.
+by rewrite /prop_near1 => FF xP; have [] := @filter_ex _ _ FF [set _ | P].
+Qed.
 Arguments have_near {U fT} x.
 
 Tactic Notation "near" constr(F) "=>" ident(x) :=
   apply: (have_near F); near=> x.
 
-Lemma near T (F : set_system T) P (FP : F P) (x : T)
+(* TODO: huh?
+Lemma near T (F : set_system T) (P : F) (x : T)
   (Px : prop_of (InFilter FP) x) : P x.
 Proof. by move: Px; rewrite prop_ofE. Qed.
 Arguments near {T F P} FP x Px.
+ *)
 
-Lemma nearW {T : Type} {F : set_system T} (P : T -> Prop) :
+Lemma nearW {T : Type} {F : set_system T} (P : T -> bool) :
   Filter F -> (forall x, P x) -> (\forall x \near F, P x).
-Proof. by move=> FF FP; apply: filterS filterT. Qed.
+Proof.
+by move=> FF FP; apply: filterS filterT => //; apply/subsetP => x _; exact: FP.
+Qed.
 
 Lemma filterE {T : Type} {F : set_system T} :
-  Filter F -> forall P : set T, (forall x, P x) -> F P.
-Proof. by move=> [FT _ +] P fP => /(_ setT); apply. Qed.
+  Filter F -> forall P : set T, (forall x, x \in P) -> P \in F.
+Proof.
+move=> [FT _ +] P fP => /(_ setT); apply; apply/subsetP => x _; exact: fP.
+Qed.
 
 Lemma filter_app (T : Type) (F : set_system T) :
-  Filter F -> forall P Q : set T, F (fun x => P x -> Q x) -> F P -> F Q.
-Proof. by move=> FF P Q subPQ FP; near=> x do suff: P x.
+  Filter F -> forall P Q : set T, [set x | (x \in P) ==> (x \in Q)] \in F ->
+  P \in F -> Q \in F.
+Proof. move=> FF P Q subPQ FP.
+(near=> x do (suff: x \in P; first apply/implyP)) => //.
+by rewrite -[X in X \in F]set_mem_set in FP.
 Unshelve. all: by end_near. Qed.
 
 Lemma filter_app2 (T : Type) (F : set_system T) :
-  Filter F -> forall P Q R : set T,  F (fun x => P x -> Q x -> R x) ->
-  F P -> F Q -> F R.
+  Filter F -> forall P Q R : set T,
+  [set x | (x \in P) ==> (x \in Q) ==> (x \in R)] \in F ->
+  P \in F -> Q \in F -> R \in F.
 Proof. by move=> ???? PQR FP; apply: filter_app; apply: filter_app FP. Qed.
 
 Lemma filter_app3 (T : Type) (F : set_system T) :
-  Filter F -> forall P Q R S : set T, F (fun x => P x -> Q x -> R x -> S x) ->
-  F P -> F Q -> F R -> F S.
+  Filter F -> forall P Q R S : set T,
+  [set x | (x \in P) ==> (x \in Q) ==> (x \in R) ==> (x \in S)] \in F ->
+  P \in F -> Q \in F -> R \in F -> S \in F.
 Proof. by move=> ????? PQR FP; apply: filter_app2; apply: filter_app FP. Qed.
 
 Lemma filterS2 (T : Type) (F : set_system T) :
-  Filter F -> forall P Q R : set T, (forall x, P x -> Q x -> R x) ->
-  F P -> F Q -> F R.
-Proof. by move=> ? ? ? ? ?; apply: filter_app2; apply: filterE. Qed.
+  Filter F -> forall P Q R : set T, (forall x, x \in P -> x \in Q -> x \in R) ->
+  P \in F -> Q \in F -> R \in F.
+Proof.
+move=> ? ? ? ? PQR; apply: filter_app2; apply: filterE => x.
+by apply/implyP => xP; apply/implyP; apply: PQR.
+Qed.
 
 Lemma filterS3 (T : Type) (F : set_system T) :
-  Filter F -> forall P Q R S : set T, (forall x, P x -> Q x -> R x -> S x) ->
-  F P -> F Q -> F R -> F S.
-Proof. by move=> ? ? ? ? ? ?; apply: filter_app3; apply: filterE. Qed.
+  Filter F -> forall P Q R S : set T, (forall x, x \in P -> x \in Q -> x \in R -> x \in S) ->
+  P \in F -> Q \in F -> R \in F -> S \in F.
+Proof.
+move=> ? ? ? ? ? PQRS; apply: filter_app3; apply: filterE => x.
+by apply/implyP => xP; apply/implyP => xQ; apply/implyP; apply: PQRS.
+Qed.
 
-Lemma filter_const {T : Type} {F} {FF: @ProperFilter T F} (P : Prop) :
-  F (fun=> P) -> P.
-Proof. by move=> FP; case: (filter_ex FP). Qed.
+Lemma filter_const {T : Type} {F} {FF: @ProperFilter T F} (P : set T) :
+  P \in F -> P.
+Proof. by move=> FP; move: (filter_ex P) => /= /cid[] x xP; apply: x. Qed.
 
 Lemma in_filter_from {I T : Type} (D : set I) (B : I -> set T) (i : I) :
-  D i -> filter_from D B (B i).
-Proof. by exists i. Qed.
+  B i \in filter_from B.
+Proof. by apply/in_bigcupP; exists i; apply: subset_refl. Qed.
 
-Lemma in_nearW {T : Type} (F : set_system T) (P : T -> Prop) (S : set T) :
-  Filter F -> F S -> {in S, forall x, P x} -> \near F, P F.
+Lemma in_nearW {T : Type} (F : set_system T) (P : set T) (S : set T) :
+  Filter F -> (\near F, F \in S) -> S `<=` P -> \near F, F \in P.
 Proof.
-move=> FF FS SP; rewrite -nbhs_nearE.
-by apply: (@filterS _ F _ S) => // x /mem_set /SP.
+by rewrite -!nbhs_nearE => FF FS SP; apply: (@filterS _ F _ S).
 Qed.
 
 Lemma near_andP {T : Type} F (b1 b2 : T -> Prop) : Filter F ->

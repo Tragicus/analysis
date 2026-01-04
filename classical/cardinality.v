@@ -744,6 +744,30 @@ Corollary finite_preimage {T U} (B : set U) (f : T -> U) :
   injective f -> finite B -> finite (f @^-1` B).
 Proof. by move=> /card_ge_preimage fB; apply: card_le_finite. Qed.
 
+Lemma range_comp {T U V} (f : T -> U) (g : U -> V) :
+  g @` (range f) = range (g \o f).
+Proof.
+by rewrite -[range f]image_setT image_comp image_setT.
+Qed.
+
+Lemma card_le_preimage {T U} (B : set U) (f : T -> U) :
+  B `<=` range f -> B #<= f @^-1` B.
+Proof.
+move=> /subsetP Bf; have [->|] := eqVneq B set0; first exact: card_ge0.
+move=> /set0P[] x xB.
+pose Bp : pointedType := HB.pack {classic B} (isPointed.Build B x).
+apply/(@pcard_surjP Bp).
+pose g (x : f @^-1` B) := f (val x).
+rewrite /Bp/=/classicType/=.
+have gB y : g y \in B by rewrite /g; case: y.
+exists g; apply/subsetP => -[] _ /[dup] /Bf /rangeP[] y <- yB _.
+by rewrite -(image_inj val_inj) range_comp/comp/= /g -range_comp range_f.
+Qed.
+
+Corollary finite_preimage_surj {T U} (B : set U) (f : T -> U) :
+  B `<=` range f -> finite (f @^-1` B) -> finite B.
+Proof. by move=> /card_le_preimage fB; apply: card_le_finite. Qed.
+
 Lemma card_le_setD T (A B : set T) : A `\` B #<= A.
 Proof. exact/subset_card_le/subDsetl. Qed.
 
@@ -1184,12 +1208,6 @@ rewrite (card_fset_set An) (card_fset_set Bm).
 by rewrite (card_eql An) (card_eqr Bm); apply: card_eq_II.
 Qed.
  *)
-
-Lemma range_comp {T U V} (f : T -> U) (g : U -> V) :
-  g @` (range f) = range (g \o f).
-Proof.
-by rewrite -[range f]image_setT image_comp image_setT.
-Qed.
 
 Lemma card_IID {n k} : `I_n `\` `I_k #= `I_(n - k)%N.
 Proof.

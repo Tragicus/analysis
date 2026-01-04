@@ -1,6 +1,6 @@
 (* mathcomp analysis (c) 2017 Inria and AIST. License: CeCILL-C.              *)
-From mathcomp Require Import ssreflect ssrfun ssrbool eqtype ssrnat seq order.
-From mathcomp Require Import boolp contra classical_sets.
+From mathcomp Require Import ssreflect ssrfun ssrbool eqtype ssrnat seq.
+From mathcomp Require Import boolp contra.
 
 (**md**************************************************************************)
 (* # Well-ordered choice                                                      *)
@@ -37,8 +37,7 @@ Set Implicit Arguments.
 Unset Strict Implicit.
 Unset Printing Implicit Defensive.
 
-Local Open Scope classical_set_scope.
-Local Open Scope order_scope.
+Definition nonempty {T: Type} (A : {pred T}) := exists x, x \in A.
 
 Section LocalProperties.
 Context {T1 T2 T3 : Type} {T : predArgType}.
@@ -65,25 +64,31 @@ Notation "{ 'in' <= S , P }" :=
   (prop_within (mem S) (inPhantom P)) : type_scope.
 
 Section RelDefs.
-Variables (d : Order.disp_t) (T : porderType d).
-Implicit Types (x y z : T) (A C : set T).
+Variables (T : Type) (R : rel T).
+Implicit Types (x y z : T) (A C : {pred T}).
 
 (* TODO: This should be ported to mathcomp. *)
-Definition maximal z := forall x, z <= x -> x <= z.
+Definition maximal z := forall x, R z x -> R x z.
 
-Definition minimal z := forall x, x <= z -> z <= x.
+Definition minimal z := forall x, R x z -> R z x.
 
-Definition upper_bound A z := z \in ubound A.
+Definition upper_bound A z := {in A, forall x, R x z}.
 
-Definition lower_bound A z := z \in lbound A.
+Definition lower_bound A z := {in A, forall x, R z x}.
 
-Definition minimums A := A `&` lbound A.
+Definition preorder := reflexive R /\ transitive R.
 
-Definition maximums A := A `&` ubound A.
+Definition partial_order := preorder /\ antisymmetric R.
 
-Definition well_order := forall A, A !=set0 -> minimums A !=set0.
+Definition total_order := partial_order /\ total R.
 
-Definition chain C := total (@Order.le d C).
+Definition minimum_of A z := z \in A /\ lower_bound A z.
+
+Definition maximum_of A z := z \in A /\ upper_bound A z.
+
+Definition well_order := forall A, nonempty A -> exists! z, minimum_of A z.
+
+Definition chain C := {in C &, total R}.
 
 Definition wo_chain C := {in <= C, well_order}.
 
@@ -352,80 +357,3 @@ by rewrite Dy -implyNb (memPn notDz).
 Qed.
 
 End Zorn.
-
-Section Zorn.
-
-Let total_on_wo_chain d (T : porderType d) (P : set T) :
-  (forall A : set T, total (@Order.le d A) -> exists t, forall s : A, val s <= t)%O ->
-  wo_chain <=%O (fun x => x \in P) -> exists z, upper_bound <=%O P z.
-Proof.
-move=> Atot RP.
-suff : total (@Order.le d P).
-  move=> /Atot[] t Pt; exists t => s sP.
-move=> s t Ps Pt; have [| |] := RP [predU (pred1 s) & (pred1 t)].
-- by move=> x; rewrite !inE => /orP[/eqP ->{x}|/eqP ->{x}].
-- by exists s; rewrite !inE eqxx.
-- move=> x [[]]; rewrite !inE => /orP[/eqP ->{x}|/eqP ->{x}].
-  + by move=> /(_ t); rewrite !inE eqxx orbT => /(_ isT) Rst _; left.
-  + by move=> /(_ s); rewrite !inE eqxx => /(_ isT) Rts _; right.
-Qed.
-
-Lemma Zorn (T : porderType) :
-  (forall A : set T, total (@Order.le A) -> exists t, forall s : A, s <= t) ->
-  exists t, forall s, t <= s -> s = t.
-Proof.
-move: R; elim/Peq : T => T R Rxx Rtrans Ranti Atot.
-have [//| |P _ RP|] := @Zorn's_lemma _ R predT _.
-- by move=> ? ? ? _ _ _; exact: Rtrans.
-- exact: total_on_wo_chain.
-by move=> x _ Rx; exists x => s Rxs; apply: (Ranti _ _ _ Rxs) => //; exact: Rx.
-Qed.
-
-Definition premaximal T (R : T -> T -> Prop) (t : T) :=
-  forall s, R t s -> R s t.
-
-Lemma ZL_preorder (T : Type) (t0 : T) (R : rel T) :
-  (forall t, R t t) -> (forall r s t, R r s -> R s t -> R r t) ->
-  (forall A, total_on A R -> exists t, forall s, A s -> R s t) ->
-  exists t, premaximal R t.
-Proof.
-move: t0 R; elim/Peq : T => T t0 R Rxx Rtrans Atot.
-have [//| | |z _ Hz] := @Zorn's_lemma T R predT.
-- by move=> ? ? ? _ _ _; exact: Rtrans.
-- by move=> A _ RA; exact: total_on_wo_chain.
-by exists z => s Rzs; exact: Hz.
-Qed.
-
-End Zorn.
-
-Section Zorn_subset.
-Variables (T : Type) (P : set (set T)).
-
-Lemma Zorn_bigcup :
-    (forall F : set (set T), F `<=` P -> total_on F subset ->
-      P (\bigcup_(X in F) X)) ->
-  exists A, P A /\ forall B, A `<` B -> ~ P B.
-Proof.
-move=> totP; pose R (sA sB : P) := `[< sval sA `<=` sval sB >].
-have {}totR F (FR : total_on F R) : exists sB, forall sA, F sA -> R sA sB.
-   have FP : [set val x | x in F] `<=` P.
-     by move=> _ [X FX <-]; apply: set_mem; exact/valP.
-   have totF : total_on [set val x | x in F] subset.
-     move=> _ _ [X FX <-] [Y FY <-].
-     by have [/asboolP|/asboolP] := FR _ _ FX FY; [left|right].
-   exists (SigSub (mem_set (totP _ FP totF))) => A FA.
-   exact/asboolP/(bigcup_sup (imageP val _)).
-have [| | |sA sAmax] := Zorn _ _ _ totR.
-- by move=> ?; apply/asboolP; exact: subset_refl.
-- by move=> ? ? ? /asboolP ? /asboolP st; apply/asboolP; exact: subset_trans st.
-- by move=> [A PA] [B PB] /asboolP AB /asboolP BA; exact/eq_exist/seteqP.
-- exists (val sA); case: sA => A PA /= in sAmax *; split; first exact: set_mem.
-  move=> B AB PB.
-  have : R (exist (fun x : T -> Prop => x \in P) A PA) (SigSub (mem_set PB)).
-    by apply/asboolP; exact: properW.
-  move=> /(sAmax (SigSub (mem_set PB)))[BA].
-  by move: AB; rewrite BA; exact: properxx.
-Qed.
-
-End Zorn_subset.
-
