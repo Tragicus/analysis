@@ -354,22 +354,216 @@ exact: (leq_trans (leq_div _ _)).
 Qed.
 
 Definition multiplicative (f : nat -> R) :=
-  forall n m, coprime n m -> f (n * m) = f n * f m.
+  forall n m, coprime n m -> f (n * m)%N = f n * f m.
+
+Lemma dvdnM (k m n : nat) : ((0 < k) || (0 < m)) -> (k %| m * n = (k %/ gcdn k m %| n)).
+Proof.
+case: k => /=; first by rewrite div0n !dvd0n muln_eq0 lt0n => /negPf ->.
+move=> k _.
+have km0: 0 < gcdn k.+1 m by rewrite gcdn_gt0.
+move: (gcdn k.+1 m) km0 (dvdn_gcdl k.+1 m) (dvdn_gcdr k.+1 m) ((dvdn_gcd^~ k.+1)^~ m).
+move=> d d0 /dvdnP[] a -> /dvdnP[] b -> dP.
+rewrite mulnAC dvdn_pmul2r// mulnK// Gauss_dvdr//.
+move: (dP ((gcdn a b) * d)); rewrite !dvdn_pmul2r// dvdn_gcdl dvdn_gcdr.
+by rewrite -dvdn_divRL// divnn d0/= dvdn1.
+Qed.
+
+Lemma gcdnZ (k m n : nat) : (k * gcdn m n = gcdn (k * m) (k * n))%N.
+Proof.
+case: k => // k.
+(apply/esym/gcdn_def; rewrite ?dvdn_pmul2l//) => [||d].
+- exact: dvdn_gcdl.
+- exact: dvdn_gcdr.
+have dn0 : 0 < gcdn d k.+1 by rewrite gcdn_gt0 orbT.
+case: d dn0 => [|d] dn0; first by rewrite !dvd0n !muln_eq0/= => /eqP -> /eqP ->.
+by rewrite !dvdnM// dvdn_gcd => ->.
+Qed.
+
+Lemma coprime_gcdn (k m n : nat) : coprime m n -> coprime (gcdn k m) (gcdn k n).
+Proof.
+move=> /eqP mn; apply/eqP/gcdn_def => // d.
+by rewrite -mn !dvdn_gcd => /andP[] _ -> /andP[] _.
+Qed.
+
+Lemma mulnI (k : nat) : 0 < k -> injective (muln k).
+Proof.
+by move=> k0 => m n /(congr1 (divn^~ k)); rewrite mulnC mulnK// mulnC mulnK.
+Qed.
+
+Lemma gcdnM (k m n : nat) : coprime m n -> (gcdn k (m * n) = gcdn k m * gcdn k n)%N.
+Proof.
+move=> /[dup] mn /(coprime_gcdn k) kmn.
+apply/gcdn_def.
+- by rewrite Gauss_dvd// !dvdn_gcdl.
+- by apply: dvdn_mul; apply: dvdn_gcdr.
+case=> [|d dk].
+  by rewrite !dvd0n muln_eq0 => /eqP -> /orP[] /eqP -> //; rewrite muln0.
+rewrite dvdnM// => dmn.
+have dm0 : 0 < gcdn d.+1 m by rewrite gcdn_gt0.
+rewrite -(mulKn d.+1 dm0) -muln_divA; last exact: dvdn_gcdl.
+apply: dvdn_mul; rewrite dvdn_gcd; apply/andP; split=> //.
+- exact/(dvdn_trans _ dk)/dvdn_gcdl.
+- exact: dvdn_gcdr.
+- by rewrite -dvdnM// dvdn_mull.
+Qed.
+
+Lemma gcdn_prod (I : Type) (r : seq I) (P : pred I) (F : I -> nat) k :
+  pairwise coprime [seq F i | i <- r & P i] ->
+  (gcdn k (\prod_(i <- r | P i) F i) = \prod_(i <- r | P i) gcdn k (F i))%N.
+Proof.
+elim: r k => [k _|x r IHr k]; first by rewrite !big_nil gcdn1.
+rewrite !big_cons/=; case: ifP => Px; last exact: IHr.
+move=> /= /andP[] xr rc.
+rewrite gcdnM ?IHr// /coprime IHr//.
+elim: r xr {rc IHr} => [_|y r IHr]/=; first by rewrite big_nil.
+rewrite big_cons; case: ifP => Py//= /andP[] /eqP -> /IHr.
+by rewrite mul1n.
+Qed.
+
+Lemma coprimeW (k l m n : nat) : k %| m -> l %| n -> coprime m n -> coprime k l.
+Proof.
+move=> km ln /eqP mn; apply/eqP/gcdn_def => // d dk dl.
+rewrite -mn dvdn_gcd; apply/andP; split; first exact: (dvdn_trans dk).
+exact: (dvdn_trans dl).
+Qed.
 
 Lemma dirichlet_mul_multiplicative (f g : dirichlet) :
   multiplicative f -> multiplicative g -> multiplicative (f * g).
 Proof.
-move=> fm gm [|n] m.
+move=> fm gm n m.
+wlog: n m / (n <= m)%N => nm.
+  move: (leq_total n m) => /orP[/nm //|mn].
+  rewrite coprime_sym mulnC [RHS]mulrC.
+  exact: (nm _ _ mn).
+case: n nm => [_|n nm].
   rewrite /coprime gcd0n => /eqP ->.
-  rewrite mul0r.
-STOP.
-Search gcdn 0%N.
-m nm.
-rewrite !dirichlet_mulE_dvdn.
+  rewrite mul0n [_ 0%N]big_nat_recl// [X in (X + _)]big_nat_recl// !big_nat1.
+  under eq_bigl do rewrite mul1n.
+  rewrite big_nat1_eq/= [X in _ = _ * X]big_nat_recl//= big_pred0//= add0r.
+  rewrite big_nat_recl//=.
+  under eq_bigl do rewrite mul1n.
+  rewrite big_nat1_eq/= big_nat1.
+  under eq_bigl => d.
+    have ->: (2 * d)%N == 1 = false.
+      apply/eqP => /esym d2.
+      suff: 2 %| 1 by [].
+      by apply/dvdnP; exists d; rewrite mulnC.
+    over.
+  rewrite big_pred0// addr0 !mulrDl mulrACA.
+  move: (fm 0 1 erefl) (gm 0 1 erefl).
+  rewrite mul0n => fm1 gm1.
+  rewrite -fm1 -gm1 mulrACA -fm1 mulrACA -gm1 -(fm 1 1 erefl) -(gm 1 1 erefl).
+  by rewrite muln1.
+case: m nm => // m _ nm.
+rewrite dirichlet_mulE_dvdn// big_add1/= big_mkord.
+under eq_bigl => d.
+  set b := _ %| _.
+  have -> : b = (d \in [set d : 'I_(n.+1 * m.+1) | d.+1 %| n.+1 * m.+1]).
+    by rewrite inE.
+  over.
+rewrite [X in bigop _ _ X]/=.
+have ltnm (d0 : 'I_n.+1) (d1 : 'I_m.+1) : (d0.+1 * d1.+1).-1 < n.+1 * m.+1.
+  by rewrite prednK// leq_mul.
+have ->: [set d0 : 'I_(n.+1 * m.+1) | d0.+1 %| (n.+1 * m.+1)%R] = [set (Ordinal (ltnm d.1 d.2)) | d in [set d : 'I_n.+1 * 'I_m.+1 | (d.1.+1 %| n.+1) && (d.2.+1 %| m.+1)]].
+  apply/eqP; rewrite eqEsubset.
+  apply/andP; split; apply/subsetP => d; rewrite inE; last first.
+    move=> /imsetP[] [] d0 d1; rewrite inE/= => /andP[] dn dm ->.
+    exact: (dvdn_mul dn dm).
+  move=> /gcdn_idPl; rewrite gcdnM// => /esym dE.
+  have dn0 : 0 < gcdn d.+1 n.+1 by rewrite gcdn_gt0.
+  have dn : (gcdn d.+1 n.+1).-1 < n.+1.
+    by rewrite prednK//; apply: dvdn_leq => //; apply: dvdn_gcdr.
+  have dm0 : 0 < gcdn d.+1 m.+1 by rewrite gcdn_gt0.
+  have dm : (gcdn d.+1 m.+1).-1 < m.+1.
+    by rewrite prednK//; apply: dvdn_leq => //; apply: dvdn_gcdr.
+  apply/imsetP; exists (Ordinal dn, Ordinal dm).
+    by rewrite inE; apply/andP; split; rewrite /= prednK//; apply: dvdn_gcdr.
+  by apply/val_inj/succn_inj; rewrite [RHS]prednK/= !prednK// muln_gt0 !gcdn_gt0.
+rewrite big_imset/= => [|[] a1 a2 [] b1 b2]; last first.
+  rewrite !inE/= => /andP[] an am /andP[] bn bm.
+  move=> /(congr1 val)/(congr1 succn)/=.
+  rewrite -[LHS]/(a1.+1 * a2.+1) -[RHS]/(b1.+1 * b2.+1).
+  move=> /[dup]/(congr1 (gcdn n.+1)).
+  rewrite Gauss_gcdl; last exact: (coprimeW (dvdnn _) am).
+  rewrite Gauss_gcdl; last exact: (coprimeW (dvdnn _) bm).
+  rewrite gcdnC (gcdn_idPl an) gcdnC (gcdn_idPl bn) => /succn_inj a1E.
+  rewrite a1E => /mulnI-/(_ erefl)/succn_inj a2E.
+  by apply/pair_equal_spec; split; apply: val_inj.
+under eq_bigl do rewrite inE.
+rewrite -(pair_big (fun i => (val i).+1 %| n.+1) (fun i => (val i).+1 %| m.+1)
+  (fun i j => f ((val i).+1 * (val j).+1)%N *
+              g ((n.+1 * m.+1) %/ ((val i).+1 * (val j).+1))%N))/=.
+under eq_bigr => i din.
+  under eq_bigr => j djn.
+    rewrite fm; last exact: (coprimeW din djn).
+    rewrite divnMA -divn_mulAC// -muln_divA// gm; last first.
+      by apply: (coprimeW _ _ nm); apply: dvdn_div.
+    rewrite mulrACA.
+    over.
+  rewrite -mulr_sumr.
+  over.
+by rewrite -mulr_suml !dirichlet_mulE_dvdn// !big_add1/= !big_mkord.
+Qed.
+
+
+Lemma multiplicative_prod (I : Type) (r : seq I) (P : pred I) (F : I -> nat)
+    f : multiplicative f ->
+  pairwise coprime [seq F i | i <- [seq i <- r | P i]] ->
+  ~~ nilp [seq i <- r | P i] ->
+  f (\prod_(i <- r | P i) F i) = \prod_(i <- r | P i) f (F i).
+Proof.
+move=> fm; elim: r => [//|] x r IHr/=.
+rewrite !big_cons; case: ifPn => Px//= /andP[] xr rc _.
+rewrite fm; last first.
+  rewrite /coprime gcdn_prod//.
+  elim: r xr {IHr rc} => [|y r IHr]/=; first by rewrite big_nil.
+  rewrite big_cons/=; case: ifP => Py//= /andP[] /eqP -> /IHr.
+  by rewrite mul1n.
+rewrite -big_filter -[in RHS]big_filter.
+move: IHr; rewrite -big_filter -[RHS]big_filter.
+move: (filter _ _) rc => -[rc _|y s rc -> //].
+rewrite !big_nil mulr1.
+by move: (fm (F x) 1 (coprimen1 _)) => <-; rewrite muln1.
+Qed.
+
+Lemma coprime_primes n : pairwise coprime (primes n).
+Proof.
+apply/(pairwiseP 0) => i j /[dup] ilt + /[dup] jlt; rewrite !inE.
+move=> /(mem_nth 0) ip /(mem_nth 0) jp ij.
+move: (all_prime_primes n) => /allP pp.
+rewrite prime_coprime; last exact: pp.
+rewrite dvdn_prime2; try exact: pp.
+apply/eqP.
+move: (primes_uniq n) => /(uniqP 0)/(_ i j ilt jlt)/[apply].
+by move: ij => /[swap] ->; rewrite ltnn.
+Qed.
+
+Lemma eq_multiplicative f g : multiplicative f -> multiplicative g ->
+  f 0 = g 0 -> (forall p k, prime p -> f (p ^ k) = g (p ^ k)) -> f = g.
+Proof.
+move=> fm gm fg0 fg.
+apply/funext => -[//|] n.
+rewrite (@prod_prime_decomp n.+1)// prime_decompE big_map.
+case: n => [|n]/=; first by rewrite big_nil (fg 2 0).
+have ?: ~~ nilp [seq _ <- primes n.+2 | true]
+  by rewrite filter_predT /nilp size_eq0 primes_eq0. 
+have ?: pairwise coprime [seq i ^ logn i n.+2 | i <- primes n.+2 & true].
+  rewrite filter_predT pairwise_map.
+  apply: (sub_pairwise _ (coprime_primes _)) => a b ab.
+  exact/coprimeXr/coprimeXl.
+rewrite !multiplicative_prod// big_seq [RHS]big_seq.
+apply: eq_bigr => i.
+rewrite mem_primes => /andP[] ip _.
+exact: fg.
+Qed.
 
 End Dirichlet.
 
 HB.instance Definition _ (R : comRingType) := GRing.Zmodule.on (dirichlet R).
+
+Definition mobius (R : comNzRingType) : dirichlet R := fun n =>
+  ((n != 0) && all (fun p => logn p n == 1) (primes n))%:R *
+  (-1) ^+ (size (primes n)).
 
 Section DirichletUnit.
 (* TODO weaken to rings with decidable divisibility. *)
@@ -506,35 +700,88 @@ Qed.
 HB.instance Definition _ := GRing.ComNzRing_hasMulInverse.Build dirichlet 
   dirichlet_mulVx dirichlet_unitPl dirichlet_invr_out.
 
-Lemma dirichletVcst1E n : ((fun n => (n != 0)%:R) : dirichlet)^-1 n =
-  match primes n with
-  | [::] => (n == 1)%:R
-  | [:: p] => (-1) ^+ (logn p n)
-  | _ => 0
-  end.
+Lemma primes_coprime n m : 0 < n -> 0 < m -> coprime n m ->
+  perm_eq (primes n ++ primes m) (primes (n * m)).
 Proof.
-have f1: ((fun n0 : nat => (n0 != 0)%:R) : dirichlet.dirichlet R) \in GRing.unit.
-  apply/andP/andP; rewrite eqxx add0r andbb oner_neq0.
-  exact: unitr1.
-move: n; rewrite -/(_ =1 _) -funeqE.
-apply/esym/(mulrI f1); rewrite divrr//.
-apply: funext => n.
-rewrite [LHS]big_nat_recl//.
-under eq_bigr do rewrite mul0r.
-rewrite big1// add0r.
-under eq_bigr do under eq_bigr do rewrite mul1r.
-case: n => [|n].
-  rewrite big_nat1.
-  under eq_bigl do rewrite mul1n.
-  by rewrite big_nat1_eq.
+move=> n0 m0 nm; apply: uniq_perm.
+- rewrite cat_uniq !primes_uniq andbT/= -all_predC.
+  apply/allP => k/=; rewrite !mem_primes => /andP[] kp /andP[] _ km.
+  apply/negP => /andP[] _ /andP[] _ kn.
+  move: (prime_gt1 kp); apply/negP; rewrite -leqNgt; apply/dvdn_leq => //.
+  by rewrite -(eqP nm) dvdn_gcd kn.
+- exact: primes_uniq.
+move=> k; rewrite mem_cat !mem_primes.
+case/boolP: (prime k) => kp//=.
+by rewrite muln_gt0 n0 m0/= Euclid_dvdM.
+Qed.
 
-rewrite /injective.
-Set Printing All.
-apply.
-Search GRing.inv GRing.mul.
-case pn: (primes n).
-  move: pn => /eqP; rewrite primes_eq0.
-  rewrite ltnS leq_eqVlt ltnS leqn0 => /orP[] /eqP ->.
-Search primes nil.
+Lemma unit_mobius : mobius R \in GRing.unit.
+Proof.
+apply/andP/andP; rewrite /mobius/= expr0 mul1r mul0r add0r andbb.
+exact: unitr1.
+Qed.
+
+Lemma multiplicative_mobius : multiplicative (mobius R).
+Proof.
+move=> n m nm.
+rewrite /mobius muln_eq0; case: (posnP n) => n0; first by rewrite !mul0r.
+case: (posnP m) => m0/=; first by rewrite !mul0r mulr0.
+have nmp := primes_coprime n0 m0 nm.
+rewrite -(perm_all _ nmp) all_cat.
+rewrite -(all_map (logn^~ (n * m)) (eq_op^~ 1%N)).
+rewrite (_ : map (logn^~ (n * m)) (primes n) = map (logn^~ n) (primes n)); last first.
+  apply/eqP; rewrite eq_map_all all_map; apply/allP => k.
+  rewrite mem_primes n0/= => /andP[] kp kn. 
+  rewrite lognM// addnC logn_coprime//.
+  exact: (coprime_dvdl kn).
+rewrite all_map.
+case: (all _ _) => //=; last by rewrite !mul0r.
+rewrite -(all_map (logn^~ (n * m)) (eq_op^~ 1%N)).
+rewrite (_ : map (logn^~ (n * m)) (primes m) = map (logn^~ m) (primes m)); last first.
+  apply/eqP; rewrite eq_map_all all_map; apply/allP => k.
+  rewrite mem_primes m0/= => /andP[] kp km. 
+  rewrite lognM// logn_coprime// coprime_sym.
+  exact: (coprime_dvdr km).
+rewrite all_map.
+case: (all _ _) => //=; last by rewrite !mul0r mulr0.
+by rewrite !mul1r -(perm_size nmp) size_cat exprD.
+Qed.
+
+Lemma mobiusV : (mobius R)^-1 = (fun n => (n != 0)%:R).
+Proof.
+apply/esym/(mulrI unit_mobius); rewrite divrr; last exact: unit_mobius.
+apply: eq_multiplicative.
+- apply: dirichlet_mul_multiplicative => n m/=.
+    exact: multiplicative_mobius.
+  by rewrite muln_eq0 negb_or -mulnb natrM.
+- by move=> n m _; rewrite [X in (_ X)%:R = _]muln_eq1 -mulnb natrM.
+- rewrite [LHS]big_nat_recl//=.
+  under eq_bigr do rewrite /mobius !mul0r.
+  rewrite big1// add0r big_nat1.
+  under eq_bigl do rewrite mul1n.
+  by rewrite big_nat1_eq/= mulr0.
+move=> p k pp.
+have p0 i: 0 < p ^ i by rewrite expn_gt0 prime_gt0.
+rewrite dirichlet_mulE_dvdn//.
+rewrite big_mkcond big_nat_recl/= ?p0// dvd1n divn1 -lt0n p0 mulr1.
+rewrite -big_mkcond big_nat_cond/=.
+under eq_bigr => d /andP[] /andP[] d0 _ dpk.
+  rewrite -lt0n divn_gt0// (dvdn_leq (p0 k) dpk) mulr1.
+  rewrite /mobius andTb.
+  move: dpk d0; rewrite -ltnS => /dvdn_pfactor-/(_ pp)[] i ik dE.
+  rewrite dE -[X in X.+1](expn0 p) ltn_exp2l ?prime_gt1// => i0.
+  rewrite primesX// primes_prime//= pfactorK// andbT.
+  rewrite -(inj_eq (expnI (prime_gt1 pp))) expn1 -dE.
+  rewrite -[X in _ == X]prednK; last exact: prime_gt0.
+  rewrite eqSS mulrb !fun_if if_arg mul1r mul0r expr1.
+  over.
+rewrite -big_nat_cond -big_mkcondl big_mkcondr big_nat1_eq.
+rewrite ltn_predRL prime_gt1//= prednK ?prime_gt0//.
+rewrite /mobius/= mul1r expr0.
+case: k => [|k]; first by rewrite expn0 leqNgt prime_gt1//= addr0.
+have pk: p %| p ^ k.+1 by apply/dvdn_exp.
+rewrite pk (dvdn_leq _ pk) ?p0// subrr -[X in _ = (_ == X)%:R](expn0 p).
+by rewrite (inj_eq (expnI (prime_gt1 pp))).
+Qed.
 
 End DirichletUnit.
